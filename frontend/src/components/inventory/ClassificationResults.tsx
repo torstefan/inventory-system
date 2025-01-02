@@ -1,5 +1,3 @@
-'use client'
-
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Classification } from './types';
@@ -37,14 +35,33 @@ export default function ClassificationResults({ classification, onReset }: Class
       setStoredStatus('pending');
       setStatusMessage('Storing item...');
 
-      const response = await axios.post('http://localhost:5000/api/inventory/items', {
-        ...parsedClassification,
-        selected_location: selectedLocation
-      });
+      console.log('Raw classification:', parsedClassification);
+      console.log('Properties:', parsedClassification.properties);
+      console.log('Selected location before sending:', selectedLocation);
+
+      // Ensure we're sending all the necessary data
+      const itemData = {
+        category: parsedClassification.category,
+        subcategory: parsedClassification.subcategory,
+        brand: parsedClassification.properties?.brand,
+        model: parsedClassification.properties?.model,
+        condition: parsedClassification.properties?.condition,
+        selected_location: selectedLocation ? {
+          shelf: selectedLocation.shelf,
+          container: selectedLocation.container,
+          reasoning: selectedLocation.reasoning // Include reasoning for debugging
+        } : null,
+        raw_properties: parsedClassification.properties
+      };
+
+      console.log('Final item data being sent:', itemData);
+
+      const response = await axios.post('http://localhost:5000/api/inventory/items', itemData);
 
       setStoredStatus('success');
       setStatusMessage('Item successfully stored in the database');
     } catch (error: any) {
+      console.error('Storage error:', error);
       setStoredStatus('error');
       setStatusMessage(error.response?.data?.error || 'Error storing item');
     }
@@ -54,7 +71,6 @@ export default function ClassificationResults({ classification, onReset }: Class
     <div className="mt-4 p-4 bg-white rounded-lg shadow">
       <h3 className="text-lg font-semibold mb-2">Classification Results</h3>
       
-      {/* Status Message */}
       {statusMessage && (
         <div className={`mb-4 p-3 rounded-lg ${
           storedStatus === 'success' ? 'bg-green-100 text-green-700' :

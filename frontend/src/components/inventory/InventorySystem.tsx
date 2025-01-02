@@ -5,11 +5,11 @@ import axios from 'axios';
 import CameraCapture from '@/components/inventory/CameraCapture';
 import ClassificationResults from '@/components/inventory/ClassificationResults';
 import SearchPanel from '@/components/inventory/SearchPanel';
-import VoiceInput from '@/components/inventory/VoiceInput';
+import ItemList from './ItemList';
 import { Classification } from './types';
 
 export default function InventorySystem() {
-  const [mode, setMode] = useState<'register' | 'search'>('register');
+  const [mode, setMode] = useState<'register' | 'search' | 'list'>('register');
   const [inputMethod, setInputMethod] = useState<'text' | 'image'>('text');
   const [itemDescription, setItemDescription] = useState('');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -33,19 +33,6 @@ export default function InventorySystem() {
     } catch (error) {
       console.error('Upload error:', error);
       alert('Error uploading image');
-    }
-  };
-
-  const handleVoiceInput = (transcript: string) => {
-    if (classificationResult) {
-      const newClassification = {
-        ...classificationResult,
-        properties: {
-          ...classificationResult.properties,
-          model: transcript,
-        }
-      };
-      setClassificationResult(newClassification);
     }
   };
 
@@ -74,6 +61,14 @@ export default function InventorySystem() {
           onClick={() => setMode('search')}
         >
           Search
+        </button>
+        <button
+          className={`px-4 py-2 rounded-lg ${
+            mode === 'list' ? 'bg-blue-500 text-white' : 'bg-gray-200'
+          }`}
+          onClick={() => setMode('list')}
+        >
+          View All Items
         </button>
       </div>
 
@@ -142,9 +137,6 @@ export default function InventorySystem() {
                 classification={classificationResult}
                 onReset={handleReset}
               />
-              <div className="mt-4">
-                <VoiceInput onTranscript={handleVoiceInput} />
-              </div>
             </div>
           )}
         </div>
@@ -152,6 +144,9 @@ export default function InventorySystem() {
 
       {/* Search Mode */}
       {mode === 'search' && <SearchPanel />}
+
+      {/* List Mode */}
+      {mode === 'list' && <ItemList />}
     </div>
   );
 }
