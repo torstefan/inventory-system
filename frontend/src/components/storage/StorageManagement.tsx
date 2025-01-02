@@ -2,36 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-
-interface StorageLocation {
-  level1: {
-    id: number;
-    name: string;
-    description?: string;
-  };
-  level2: {
-    id: number;
-    name: string;
-    containerType: 'regular_box' | 'drawer_organizer';
-    description?: string;
-  }[];
-}
-
-interface EditingState {
-  type: 'shelf' | 'container' | null;
-  id: number | null;
-  data: any;
-}
+import { StorageLocation, EditingState } from './types';
+import ShelfItem from './ShelfItem';
 
 export default function StorageManagement() {
   const [locations, setLocations] = useState<StorageLocation[]>([]);
   const [newShelf, setNewShelf] = useState({ name: '', description: '' });
   const [selectedShelf, setSelectedShelf] = useState<number | null>(null);
-  const [newContainer, setNewContainer] = useState({
-    name: '',
-    containerType: 'regular_box' as const,
-    description: ''
-  });
   const [editing, setEditing] = useState<EditingState>({
     type: null,
     id: null,
@@ -39,6 +16,7 @@ export default function StorageManagement() {
   });
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddingShelf, setIsAddingShelf] = useState(false);
 
   useEffect(() => {
     fetchShelves();
@@ -138,7 +116,22 @@ export default function StorageManagement() {
     }
   };
 
-  // ... existing add methods ...
+  const handleAddShelf = async () => {
+    try {
+      if (!newShelf.name.trim()) {
+        setError('Shelf name is required');
+        return;
+      }
+
+      const response = await axios.post('http://localhost:5000/api/storage/level1', newShelf);
+      setLocations(prev => [...prev, { level1: response.data, level2: [] }]);
+      setNewShelf({ name: '', description: '' });
+      setIsAddingShelf(false);
+      setError(null);
+    } catch (error: any) {
+      setError(error.response?.data?.error || 'Error adding shelf');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -150,7 +143,15 @@ export default function StorageManagement() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Storage Management</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Storage Management</h1>
+        <button
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          onClick={() => setIsAddingShelf(true)}
+        >
+          Add Shelf
+        </button>
+      </div>
 
       {error && (
         <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
@@ -158,174 +159,75 @@ export default function StorageManagement() {
         </div>
       )}
 
-      {/* Add New Shelf Form - existing code ... */}
+      {isAddingShelf && (
+        <div className="mb-6 p-4 bg-white rounded-lg shadow">
+          <h2 className="text-lg font-semibold mb-4">Add New Shelf</h2>
+          <div className="space-y-2">
+            <input
+              type="text"
+              className="w-full p-2 border rounded"
+              placeholder="Shelf Name"
+              value={newShelf.name}
+              onChange={(e) => setNewShelf(prev => ({ ...prev, name: e.target.value }))}
+            />
+            <input
+              type="text"
+              className="w-full p-2 border rounded"
+              placeholder="Description (optional)"
+              value={newShelf.description}
+              onChange={(e) => setNewShelf(prev => ({ ...prev, description: e.target.value }))}
+            />
+            <div className="flex justify-end space-x-2">
+              <button
+                className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                onClick={() => {
+                  setIsAddingShelf(false);
+                  setNewShelf({ name: '', description: '' });
+                  setError(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                onClick={handleAddShelf}
+              >
+                Add Shelf
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Storage Hierarchy */}
       <div className="p-4 bg-white rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">Storage Hierarchy</h2>
+        <h2 className="text-xl font-semibold mb-4">Storage Hierarchy - Shelves</h2>
         {locations.length === 0 ? (
           <p className="text-gray-500">No storage locations defined yet.</p>
         ) : (
           locations.map((loc) => (
-            <div key={loc.level1.id} className="mb-8 border-b pb-4">
-              {/* Shelf Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex-grow">
-                  {editing.type === 'shelf' && editing.id === loc.level1.id ? (
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        className="w-full p-2 border rounded"
-                        value={editing.data.name}
-                        onChange={(e) => setEditing(prev => ({
-                          ...prev,
-                          data: { ...prev.data, name: e.target.value }
-                        }))}
-                      />
-                      <input
-                        type="text"
-                        className="w-full p-2 border rounded"
-                        value={editing.data.description || ''}
-                        placeholder="Description"
-                        onChange={(e) => setEditing(prev => ({
-                          ...prev,
-                          data: { ...prev.data, description: e.target.value }
-                        }))}
-                      />
-                      <div className="space-x-2">
-                        <button
-                          className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                          onClick={handleSaveEdit}
-                        >
-                          Save
-                        </button>
-                        <button
-                          className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
-                          onClick={handleCancelEdit}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <h3 className="font-semibold text-lg">{loc.level1.name}</h3>
-                      {loc.level1.description && (
-                        <p className="text-gray-600 text-sm">{loc.level1.description}</p>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="flex space-x-2">
-                  {editing.type === 'shelf' && editing.id === loc.level1.id ? null : (
-                    <>
-                      <button
-                        className="px-3 py-1 text-sm bg-yellow-100 text-yellow-600 rounded hover:bg-yellow-200"
-                        onClick={() => handleEditShelf(loc.level1.id)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="px-3 py-1 text-sm bg-red-100 text-red-600 rounded hover:bg-red-200"
-                        onClick={() => handleDeleteShelf(loc.level1.id)}
-                      >
-                        Delete
-                      </button>
-                      <button
-                        className="px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
-                        onClick={() => setSelectedShelf(selectedShelf === loc.level1.id ? null : loc.level1.id)}
-                      >
-                        {selectedShelf === loc.level1.id ? 'Cancel' : 'Add Container'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Containers */}
-              <div className="ml-4">
-                {loc.level2.map(container => (
-                  <div key={container.id} className="mb-2 p-2 bg-gray-50 rounded">
-                    {editing.type === 'container' && editing.id === container.id ? (
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          className="w-full p-2 border rounded"
-                          value={editing.data.name}
-                          onChange={(e) => setEditing(prev => ({
-                            ...prev,
-                            data: { ...prev.data, name: e.target.value }
-                          }))}
-                        />
-                        <select
-                          className="w-full p-2 border rounded"
-                          value={editing.data.containerType}
-                          onChange={(e) => setEditing(prev => ({
-                            ...prev,
-                            data: { ...prev.data, containerType: e.target.value }
-                          }))}
-                        >
-                          <option value="regular_box">Regular Box</option>
-                          <option value="drawer_organizer">Drawer Organizer</option>
-                        </select>
-                        <input
-                          type="text"
-                          className="w-full p-2 border rounded"
-                          value={editing.data.description || ''}
-                          placeholder="Description"
-                          onChange={(e) => setEditing(prev => ({
-                            ...prev,
-                            data: { ...prev.data, description: e.target.value }
-                          }))}
-                        />
-                        <div className="space-x-2">
-                          <button
-                            className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
-                            onClick={handleSaveEdit}
-                          >
-                            Save
-                          </button>
-                          <button
-                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
-                            onClick={handleCancelEdit}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="font-medium">{container.name}</span>
-                          <span className="ml-2 text-sm text-gray-500">
-                            ({container.containerType === 'regular_box' ? 'Box' : 'Drawer Organizer'})
-                          </span>
-                          {container.description && (
-                            <p className="text-gray-600 text-sm">{container.description}</p>
-                          )}
-                        </div>
-                        <div className="space-x-2">
-                          <button
-                            className="px-2 py-1 text-sm bg-yellow-100 text-yellow-600 rounded hover:bg-yellow-200"
-                            onClick={() => handleEditContainer(loc.level1.id, container)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="px-2 py-1 text-sm bg-red-100 text-red-600 rounded hover:bg-red-200"
-                            onClick={() => handleDeleteContainer(container.id)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Add Container Form - existing code ... */}
-            </div>
+            <ShelfItem
+              key={loc.level1.id}
+              loc={loc}
+              editing={editing}
+              selectedShelf={selectedShelf}
+              onEditShelf={handleEditShelf}
+              onDeleteShelf={handleDeleteShelf}
+              onEditContainer={handleEditContainer}
+              onDeleteContainer={handleDeleteContainer}
+              onSaveEdit={handleSaveEdit}
+              onCancelEdit={handleCancelEdit}
+              setEditing={setEditing}
+              setSelectedShelf={setSelectedShelf}
+              onContainerSuccess={(newContainer) => {
+                setLocations(prev => prev.map(l => 
+                  l.level1.id === loc.level1.id 
+                    ? { ...l, level2: [...l.level2, newContainer] }
+                    : l
+                ));
+                setSelectedShelf(null);
+              }}
+            />
           ))
         )}
       </div>
