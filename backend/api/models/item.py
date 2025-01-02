@@ -1,25 +1,27 @@
-from datetime import datetime
-from backend.database.db import Base
-from sqlalchemy import Column, Integer, String, JSON, DateTime
+# backend/api/models/item.py
 
-class Item(Base):
-    __tablename__ = "items"
-    
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy.orm import relationship
+from database.db import Base
+from datetime import datetime
+
+class StoredItem(Base):
+    """Represents items stored in the system"""
+    __tablename__ = 'stored_items'
+
     id = Column(Integer, primary_key=True)
-    category = Column(String)
+    category = Column(String, nullable=False)
     subcategory = Column(String)
-    properties = Column(JSON)
-    location = Column(JSON)
-    image_path = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    brand = Column(String)
+    model = Column(String)
+    condition = Column(String)
     
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'category': self.category,
-            'subcategory': self.subcategory,
-            'properties': self.properties,
-            'location': self.location,
-            'image_path': self.image_path,
-            'created_at': self.created_at.isoformat()
-        }
+    # Storage location
+    level3_id = Column(Integer, ForeignKey('storage_level3.id'))
+    location = relationship("StorageLevel3")
+    
+    # Additional metadata
+    image_path = Column(String)
+    notes = Column(String)
+    date_added = Column(DateTime, default=datetime.utcnow)
+    last_modified = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

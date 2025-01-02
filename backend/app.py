@@ -1,3 +1,5 @@
+# backend/app.py
+
 from flask import Flask, jsonify
 from flask_cors import CORS
 from api.routes import register_routes
@@ -15,7 +17,15 @@ logging.basicConfig(
 )
 
 app = Flask(__name__)
-CORS(app)
+
+# Configure CORS
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:3000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 # Enhanced error handler
 @app.errorhandler(Exception)
