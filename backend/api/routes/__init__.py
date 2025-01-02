@@ -2,7 +2,7 @@
 
 from flask import Blueprint
 from .image_routes import image_bp
-from .inventory_routes import inventory_bp
+from .inventory.item_routes import inventory_bp  # Updated import
 from .storage_routes import storage_bp
 
 api = Blueprint('api', __name__)
