@@ -5,6 +5,8 @@ project_dump.txt
 project_status.txt
 setup_backend.sh
 setup_components.sh
+backend/static/uploads/*
+backend/debug.log
 
 # Python
 __pycache__/
