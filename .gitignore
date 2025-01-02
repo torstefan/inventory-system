@@ -1,3 +1,11 @@
+# Project
+package-lock.json
+package.json
+project_dump.txt
+project_status.txt
+setup_backend.sh
+setup_components.sh
+
 # Python
 __pycache__/
 *.py[cod]
