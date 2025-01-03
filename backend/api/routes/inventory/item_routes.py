@@ -1,145 +1,157 @@
 # backend/api/routes/inventory/item_routes.py
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
+from sqlalchemy.orm import Session
 from database.db import SessionLocal
 from api.models.item import StoredItem
 from api.models.storage import StorageLevel1, StorageLevel2, StorageLevel3
-from sqlalchemy.orm import joinedload
-from .location_handler import handle_location_assignment
 
 inventory_bp = Blueprint('inventory', __name__)
 
-@inventory_bp.route('/items', methods=['GET'])
-def get_items():
+def get_db():
     db = SessionLocal()
     try:
-        items = db.query(StoredItem).options(
-            joinedload(StoredItem.location).joinedload(StorageLevel3.container).joinedload(StorageLevel2.shelf)
-        ).all()
-        
-        items_data = []
-        for item in items:
-            items_data.append(format_item_data(item))
-        
-        return jsonify({'items': items_data})
-        
-    except Exception as e:
-        print(f"Error in get_items: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return db
     finally:
         db.close()
 
+@inventory_bp.route('/items', methods=['GET'])
+def get_items():
+    try:
+        db = get_db()
+        items = db.query(StoredItem).all()
+        return jsonify({
+            'items': [item.to_dict() for item in items]
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error fetching items: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @inventory_bp.route('/items', methods=['POST'])
 def create_item():
-    data = request.json
-    print("Received data:", data)
-    db = SessionLocal()
-    
     try:
-        new_item = create_item_object(data)
+        data = request.get_json()
+        db = get_db()
         
-        # Handle location assignment
-        if 'selected_location' in data:
-            handle_location_assignment(db, new_item, data['selected_location'])
+        # Create new item
+        new_item = StoredItem(
+            category=data['category'],
+            subcategory=data.get('subcategory'),
+            brand=data.get('brand'),
+            model=data.get('model'),
+            condition=data.get('condition'),
+            technical_description=data.get('technical_description'),
+            use_cases=data.get('use_cases', []),
+            image_path=data.get('image_path')
+        )
         
+        # Handle location if provided
+        if data.get('selected_location'):
+            loc = data['selected_location']
+            shelf = db.query(StorageLevel1).filter_by(name=loc['shelf']).first()
+            if shelf:
+                container = db.query(StorageLevel2).filter_by(
+                    shelf_id=shelf.id, 
+                    name=loc['container']
+                ).first()
+                if container:
+                    # Create or get default compartment
+                    compartment = db.query(StorageLevel3).filter_by(
+                        container_id=container.id,
+                        name='default'
+                    ).first()
+                    if not compartment:
+                        compartment = StorageLevel3(
+                            container_id=container.id,
+                            name='default'
+                        )
+                        db.add(compartment)
+                    new_item.level3_id = compartment.id
+
         db.add(new_item)
         db.commit()
         db.refresh(new_item)
         
-        return jsonify({
-            'message': 'Item created successfully',
-            'id': new_item.id
-        })
+        return jsonify(new_item.to_dict())
         
     except Exception as e:
         db.rollback()
+        current_app.logger.error(f"Error creating item: {str(e)}")
         return jsonify({'error': str(e)}), 400
-    finally:
-        db.close()
 
 @inventory_bp.route('/items/<int:item_id>', methods=['PUT'])
 def update_item(item_id):
-    data = request.json
-    db = SessionLocal()
     try:
+        data = request.get_json()
+        db = get_db()
+        
         item = db.query(StoredItem).filter_by(id=item_id).first()
         if not item:
             return jsonify({'error': 'Item not found'}), 404
-
-        update_item_fields(item, data)
         
-        # Handle location update
-        if 'selected_location' in data:
-            handle_location_assignment(db, item, data['selected_location'])
+        # Update basic fields
+        if 'category' in data:
+            item.category = data['category']
+        if 'subcategory' in data:
+            item.subcategory = data['subcategory']
+        if 'brand' in data:
+            item.brand = data['brand']
+        if 'model' in data:
+            item.model = data['model']
+        if 'condition' in data:
+            item.condition = data['condition']
+        if 'technical_description' in data:
+            item.technical_description = data['technical_description']
+        if 'use_cases' in data:
+            item.use_cases = data['use_cases']
+            
+        # Update location if provided
+        if data.get('selected_location'):
+            loc = data['selected_location']
+            shelf = db.query(StorageLevel1).filter_by(name=loc['shelf']).first()
+            if shelf:
+                container = db.query(StorageLevel2).filter_by(
+                    shelf_id=shelf.id, 
+                    name=loc['container']
+                ).first()
+                if container:
+                    # Create or get default compartment
+                    compartment = db.query(StorageLevel3).filter_by(
+                        container_id=container.id,
+                        name='default'
+                    ).first()
+                    if not compartment:
+                        compartment = StorageLevel3(
+                            container_id=container.id,
+                            name='default'
+                        )
+                        db.add(compartment)
+                    item.level3_id = compartment.id
 
         db.commit()
-        return jsonify({'message': 'Item updated successfully'})
+        db.refresh(item)
+        return jsonify(item.to_dict())
         
     except Exception as e:
         db.rollback()
+        current_app.logger.error(f"Error updating item: {str(e)}")
         return jsonify({'error': str(e)}), 400
-    finally:
-        db.close()
 
 @inventory_bp.route('/items/<int:item_id>', methods=['DELETE'])
 def delete_item(item_id):
-    db = SessionLocal()
     try:
+        db = get_db()
         item = db.query(StoredItem).filter_by(id=item_id).first()
+        
         if not item:
             return jsonify({'error': 'Item not found'}), 404
-
+            
         db.delete(item)
         db.commit()
+        
         return jsonify({'message': 'Item deleted successfully'})
         
     except Exception as e:
         db.rollback()
+        current_app.logger.error(f"Error deleting item: {str(e)}")
         return jsonify({'error': str(e)}), 400
-    finally:
-        db.close()
-
-def format_item_data(item):
-    """Format item data for API response"""
-    location_info = {
-        'shelf': None,
-        'container': None
-    }
-    
-    if item.location and item.location.container:
-        container = item.location.container
-        location_info['container'] = container.name
-        if container.shelf:
-            location_info['shelf'] = container.shelf.name
-    
-    return {
-        'id': item.id,
-        'category': item.category,
-        'subcategory': item.subcategory,
-        'brand': item.brand,
-        'model': item.model,
-        'condition': item.condition,
-        'location': location_info,
-        'image_path': item.image_path,
-        'date_added': item.date_added.isoformat(),
-        'last_modified': item.last_modified.isoformat()
-    }
-
-def create_item_object(data):
-    """Create a new StoredItem object from request data"""
-    return StoredItem(
-        category=data.get('category'),
-        subcategory=data.get('subcategory'),
-        brand=data.get('brand'),
-        model=data.get('model'),
-        condition=data.get('condition'),
-        image_path=data.get('image_path'),
-        notes=data.get('notes')
-    )
-
-def update_item_fields(item, data):
-    """Update the fields of an existing item"""
-    fields = ['category', 'subcategory', 'brand', 'model', 'condition']
-    for field in fields:
-        if field in data:
-            setattr(item, field, data[field])

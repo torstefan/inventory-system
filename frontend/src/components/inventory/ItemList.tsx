@@ -8,6 +8,8 @@ interface StoredItem {
   brand: string | null;
   model: string | null;
   condition: string | null;
+  technical_description: string | null;
+  use_cases: string[] | null;
   location: {
     shelf: string | null;
     container: string | null;
@@ -27,6 +29,7 @@ export default function ItemList() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<EditingItem | null>(null);
+  const [expandedItems, setExpandedItems] = useState<number[]>([]);
   const [availableLocations, setAvailableLocations] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
 
@@ -34,15 +37,6 @@ export default function ItemList() {
     fetchItems();
     fetchLocations();
   }, []);
-
-  useEffect(() => {
-    if (editingItem?.data.selected_location) {
-      const loc = editingItem.data.selected_location;
-      setSelectedLocation(`${loc.shelf}|||${loc.container}`);
-    } else {
-      setSelectedLocation('');
-    }
-  }, [editingItem?.id]);
 
   const fetchItems = async () => {
     try {
@@ -66,19 +60,24 @@ export default function ItemList() {
     }
   };
 
+  const toggleItemExpansion = (itemId: number) => {
+    setExpandedItems(prev => 
+      prev.includes(itemId) 
+        ? prev.filter(id => id !== itemId)
+        : [...prev, itemId]
+    );
+  };
+
   const handleEdit = (item: StoredItem) => {
-    console.log('Starting edit for item:', item);
-    const editData = {
-      ...item,
-      selected_location: item.location ? {
-        shelf: item.location.shelf,
-        container: item.location.container
-      } : null
-    };
-    console.log('Edit data prepared:', editData);
     setEditingItem({
       id: item.id,
-      data: editData
+      data: {
+        ...item,
+        selected_location: item.location ? {
+          shelf: item.location.shelf,
+          container: item.location.container
+        } : null
+      }
     });
   };
 
@@ -86,28 +85,25 @@ export default function ItemList() {
     if (!editingItem) return;
 
     try {
-      // Prepare update data, ensuring we're not sending unnecessary fields
       const updateData = {
         category: editingItem.data.category,
         subcategory: editingItem.data.subcategory,
         brand: editingItem.data.brand,
         model: editingItem.data.model,
         condition: editingItem.data.condition,
+        technical_description: editingItem.data.technical_description,
+        use_cases: editingItem.data.use_cases,
         selected_location: editingItem.data.selected_location
       };
       
-      console.log('Sending update data:', updateData);
-      
-      const response = await axios.put(
+      await axios.put(
         `http://localhost:5000/api/inventory/items/${editingItem.id}`, 
         updateData
       );
-      console.log('Update response:', response.data);
       
       setEditingItem(null);
-      await fetchItems();  // Refresh the list
+      await fetchItems();
     } catch (error: any) {
-      console.error('Error saving item:', error);
       setError(error.response?.data?.error || 'Error updating item');
     }
   };
@@ -123,25 +119,9 @@ export default function ItemList() {
     }
   };
 
-  if (isLoading) {
-    return <div className="p-4">Loading items...</div>;
-  }
-
-  if (error) {
-    return (
-      <div className="p-4 bg-red-100 text-red-700 rounded-lg">
-        {error}
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="p-4 text-gray-500">
-        No items in inventory yet.
-      </div>
-    );
-  }
+  if (isLoading) return <div className="p-4">Loading items...</div>;
+  if (error) return <div className="p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>;
+  if (items.length === 0) return <div className="p-4 text-gray-500">No items in inventory yet.</div>;
 
   return (
     <div className="space-y-4">
@@ -160,7 +140,7 @@ export default function ItemList() {
                     <label className="block text-sm font-medium text-gray-700">Category</label>
                     <input
                       type="text"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                       value={editingItem.data.category || ''}
                       onChange={(e) => setEditingItem({
                         ...editingItem,
@@ -172,7 +152,7 @@ export default function ItemList() {
                     <label className="block text-sm font-medium text-gray-700">Subcategory</label>
                     <input
                       type="text"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                       value={editingItem.data.subcategory || ''}
                       onChange={(e) => setEditingItem({
                         ...editingItem,
@@ -184,7 +164,7 @@ export default function ItemList() {
                     <label className="block text-sm font-medium text-gray-700">Brand</label>
                     <input
                       type="text"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                       value={editingItem.data.brand || ''}
                       onChange={(e) => setEditingItem({
                         ...editingItem,
@@ -196,7 +176,7 @@ export default function ItemList() {
                     <label className="block text-sm font-medium text-gray-700">Model</label>
                     <input
                       type="text"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                       value={editingItem.data.model || ''}
                       onChange={(e) => setEditingItem({
                         ...editingItem,
@@ -208,7 +188,7 @@ export default function ItemList() {
                     <label className="block text-sm font-medium text-gray-700">Condition</label>
                     <input
                       type="text"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                       value={editingItem.data.condition || ''}
                       onChange={(e) => setEditingItem({
                         ...editingItem,
@@ -219,7 +199,7 @@ export default function ItemList() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Location</label>
                     <select
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
                       value={selectedLocation}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -265,6 +245,34 @@ export default function ItemList() {
                       )}
                     </select>
                   </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Technical Description</label>
+                    <textarea
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                      rows={3}
+                      value={editingItem.data.technical_description || ''}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        data: { ...editingItem.data, technical_description: e.target.value }
+                      })}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Use Cases (one per line)</label>
+                    <textarea
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                      rows={3}
+                      value={editingItem.data.use_cases?.join('\n') || ''}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        data: { 
+                          ...editingItem.data, 
+                          use_cases: e.target.value.split('\n').filter(line => line.trim()) 
+                        }
+                      })}
+                      placeholder="Enter each use case on a new line"
+                    />
+                  </div>
                 </div>
                 <div className="flex justify-end space-x-2">
                   <button
@@ -284,54 +292,96 @@ export default function ItemList() {
             ) : (
               // Display view
               <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <span className="font-medium">Category:</span>
+                <div className="space-y-4">
+                  {/* Basic Information */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      {item.category}
-                      {item.subcategory && ` / ${item.subcategory}`}
+                      <span className="font-medium">Category:</span>
+                      <div>
+                        {item.category}
+                        {item.subcategory && ` / ${item.subcategory}`}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Brand/Model:</span>
+                      <div>
+                        {[item.brand, item.model]
+                          .filter(Boolean)
+                          .join(' ') || 'Not specified'}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Condition:</span>
+                      <div>{item.condition || 'Not specified'}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Location:</span>
+                      <div>
+                        {item.location?.shelf && item.location?.container ? (
+                          `${item.location.shelf} - ${item.location.container}`
+                        ) : 'No location assigned'}
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <span className="font-medium">Brand/Model:</span>
-                    <div>
-                      {[item.brand, item.model]
-                        .filter(Boolean)
-                        .join(' ') || 'Not specified'}
-                    </div>
+
+                  {/* Technical Details (Expandable) */}
+                  <div className="border-t pt-2">
+                    <button
+                      className="text-blue-600 hover:text-blue-800"
+                      onClick={() => toggleItemExpansion(item.id)}
+                    >
+                      {expandedItems.includes(item.id) ? 'Hide Details' : 'Show Details'}
+                    </button>
+                    
+                    {expandedItems.includes(item.id) && (
+                      <div className="mt-2 space-y-2">
+                        {item.technical_description && (
+                          <div>
+                            <span className="font-medium">Technical Description:</span>
+                            <p className="mt-1 text-gray-700">
+                              {item.technical_description}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {item.use_cases && item.use_cases.length > 0 && (
+                          <div>
+                            <span className="font-medium">Use Cases:</span>
+                            <ul className="mt-1 list-disc list-inside">
+                              {item.use_cases.map((useCase, index) => (
+                                <li key={index} className="text-gray-700 ml-4">
+                                  {useCase}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <span className="font-medium">Condition:</span>
-                    <div>{item.condition || 'Not specified'}</div>
-                  </div>
-                  <div>
-                    <span className="font-medium">Location:</span>
-                    <div>
-                      {item.location?.shelf && item.location?.container ? (
-                        `${item.location.shelf} - ${item.location.container}`
-                      ) : 'No location assigned'}
-                    </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end space-x-2">
+                    <button
+                      className="px-3 py-1 bg-yellow-100 text-yellow-600 rounded hover:bg-yellow-200"
+                      onClick={() => handleEdit(item)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                      onClick={() => handleDelete(item.id)}
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
-                <div className="mt-4 flex justify-end space-x-2">
-                  <button
-                    className="px-3 py-1 bg-yellow-100 text-yellow-600 rounded hover:bg-yellow-200"
-                    onClick={() => handleEdit(item)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200"
-                    onClick={() => handleDelete(item.id)}
-                  >
-                    Delete
-                  </button>
+                {/* Metadata */}
+                <div className="mt-2 text-sm text-gray-500">
+                  Added: {new Date(item.date_added).toLocaleDateString()}
                 </div>
               </>
             )}
-            <div className="mt-2 text-sm text-gray-500">
-              Added: {new Date(item.date_added).toLocaleDateString()}
-            </div>
           </div>
         ))}
       </div>

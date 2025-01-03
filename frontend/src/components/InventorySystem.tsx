@@ -5,74 +5,74 @@ import axios from 'axios';
 import CameraCapture from '@/components/inventory/CameraCapture';
 import ClassificationResults from '@/components/inventory/ClassificationResults';
 import SearchPanel from '@/components/inventory/SearchPanel';
-import VoiceInput from '@/components/inventory/VoiceInput';
+import ItemList from './ItemList';
 import { Classification } from './types';
 
 export default function InventorySystem() {
-  const [mode, setMode] = useState<'register' | 'search'>('register');
+  const [mode, setMode] = useState<'register' | 'search' | 'list'>('register');
   const [inputMethod, setInputMethod] = useState<'text' | 'image'>('text');
   const [itemDescription, setItemDescription] = useState('');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [classificationResult, setClassificationResult] = useState<Classification | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleImageCapture = (imageSrc: string) => {
     setCapturedImage(imageSrc);
-    setUploadError(null); // Clear any previous errors
   };
 
-  const handleUpload = async () => {
-    if (!capturedImage) return;
+  const handleTextSubmit = async () => {
+    if (!itemDescription.trim()) {
+      setError('Please provide a description of the item');
+      return;
+    }
+
+    setIsProcessing(true);
+    setError(null);
+
     try {
-      setUploadError(null); // Clear any previous errors
+      const response = await axios.post('http://localhost:5000/api/text/process', {
+        description: itemDescription
+      });
       
+      console.log('Classification result:', response.data);
+      setClassificationResult(response.data.classification);
+    } catch (error: any) {
+      console.error('Text processing error:', error);
+      setError(error.response?.data?.error || 'Error processing text description');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleImageUpload = async () => {
+    if (!capturedImage) return;
+    
+    setIsProcessing(true);
+    setError(null);
+
+    try {
       const response = await fetch(capturedImage);
       const blob = await response.blob();
       const formData = new FormData();
       formData.append('image', blob, 'item.jpg');
       
-      const result = await axios.post('http://localhost:5000/api/images/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      console.log('Upload response:', result.data);
-      
-      if (result.data.classification) {
-        setClassificationResult(result.data.classification);
-      } else {
-        throw new Error('No classification data received');
-      }
-    } catch (error) {
+      const result = await axios.post('http://localhost:5000/api/images/upload', formData);
+      console.log('Classification result:', result.data);
+      setClassificationResult(result.data.classification);
+    } catch (error: any) {
       console.error('Upload error:', error);
-      setUploadError(error instanceof Error ? error.message : 'Error uploading image');
-      setClassificationResult(null);
-    }
-  };
-
-  const handleVoiceInput = (transcript: string) => {
-    if (classificationResult) {
-      const newClassification = typeof classificationResult === 'string' 
-        ? JSON.parse(classificationResult)
-        : classificationResult;
-
-      const updatedClassification = {
-        ...newClassification,
-        properties: {
-          ...newClassification.properties,
-          model: transcript,
-        }
-      };
-      setClassificationResult(updatedClassification);
+      setError(error.response?.data?.error || 'Error uploading image');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const handleReset = () => {
     setClassificationResult(null);
     setCapturedImage(null);
-    setInputMethod('text');
-    setUploadError(null);
+    setItemDescription('');
+    setError(null);
   };
 
   return (
@@ -94,6 +94,14 @@ export default function InventorySystem() {
           onClick={() => setMode('search')}
         >
           Search
+        </button>
+        <button
+          className={`px-4 py-2 rounded-lg ${
+            mode === 'list' ? 'bg-blue-500 text-white' : 'bg-gray-200'
+          }`}
+          onClick={() => setMode('list')}
+        >
+          View All Items
         </button>
       </div>
 
@@ -119,20 +127,35 @@ export default function InventorySystem() {
             </button>
           </div>
 
-          {inputMethod === 'text' && (
-            <textarea
-              className="w-full p-2 border rounded-lg"
-              placeholder="Describe the item..."
-              value={itemDescription}
-              onChange={(e) => setItemDescription(e.target.value)}
-            />
+          {error && (
+            <div className="p-4 bg-red-100 text-red-700 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          {inputMethod === 'text' && !classificationResult && (
+            <div className="space-y-4">
+              <textarea
+                className="w-full p-2 border rounded-lg h-32"
+                placeholder="Describe the item in detail (e.g., A new Raspberry Pi 4 Model B with 8GB RAM, still in its original packaging)..."
+                value={itemDescription}
+                onChange={(e) => setItemDescription(e.target.value)}
+              />
+              <button
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg disabled:bg-gray-300"
+                onClick={handleTextSubmit}
+                disabled={isProcessing || !itemDescription.trim()}
+              >
+                {isProcessing ? 'Processing...' : 'Process Description'}
+              </button>
+            </div>
           )}
 
           {inputMethod === 'image' && !capturedImage && (
             <CameraCapture onImageCapture={handleImageCapture} />
           )}
 
-          {capturedImage && (
+          {capturedImage && !classificationResult && (
             <div>
               <img 
                 src={capturedImage} 
@@ -147,37 +170,30 @@ export default function InventorySystem() {
                   Retake
                 </button>
                 <button
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg"
-                  onClick={handleUpload}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg disabled:bg-gray-300"
+                  onClick={handleImageUpload}
+                  disabled={isProcessing}
                 >
-                  Upload
+                  {isProcessing ? 'Processing...' : 'Process Image'}
                 </button>
               </div>
             </div>
           )}
 
-          {uploadError && (
-            <div className="p-4 bg-red-100 text-red-700 rounded-lg">
-              {uploadError}
-            </div>
-          )}
-
-          {capturedImage && classificationResult && (
-            <div>
-              <ClassificationResults 
-                classification={classificationResult}
-                onReset={handleReset}
-              />
-              <div className="mt-4">
-                <VoiceInput onTranscript={handleVoiceInput} />
-              </div>
-            </div>
+          {classificationResult && (
+            <ClassificationResults 
+              classification={classificationResult}
+              onReset={handleReset}
+            />
           )}
         </div>
       )}
 
       {/* Search Mode */}
       {mode === 'search' && <SearchPanel />}
+
+      {/* List Mode */}
+      {mode === 'list' && <ItemList />}
     </div>
   );
 }

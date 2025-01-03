@@ -35,11 +35,6 @@ export default function ClassificationResults({ classification, onReset }: Class
       setStoredStatus('pending');
       setStatusMessage('Storing item...');
 
-      console.log('Raw classification:', parsedClassification);
-      console.log('Properties:', parsedClassification.properties);
-      console.log('Selected location before sending:', selectedLocation);
-
-      // Ensure we're sending all the necessary data
       const itemData = {
         category: parsedClassification.category,
         subcategory: parsedClassification.subcategory,
@@ -49,12 +44,10 @@ export default function ClassificationResults({ classification, onReset }: Class
         selected_location: selectedLocation ? {
           shelf: selectedLocation.shelf,
           container: selectedLocation.container,
-          reasoning: selectedLocation.reasoning // Include reasoning for debugging
+          reasoning: selectedLocation.reasoning
         } : null,
         raw_properties: parsedClassification.properties
       };
-
-      console.log('Final item data being sent:', itemData);
 
       const response = await axios.post('http://localhost:5000/api/inventory/items', itemData);
 
@@ -68,11 +61,11 @@ export default function ClassificationResults({ classification, onReset }: Class
   };
 
   return (
-    <div className="mt-4 p-4 bg-white rounded-lg shadow">
-      <h3 className="text-lg font-semibold mb-2">Classification Results</h3>
+    <div className="mt-4 p-4 bg-white rounded-lg shadow space-y-4">
+      <h3 className="text-lg font-semibold">Classification Results</h3>
       
       {statusMessage && (
-        <div className={`mb-4 p-3 rounded-lg ${
+        <div className={`p-3 rounded-lg ${
           storedStatus === 'success' ? 'bg-green-100 text-green-700' :
           storedStatus === 'error' ? 'bg-red-100 text-red-700' :
           'bg-blue-100 text-blue-700'
@@ -81,24 +74,52 @@ export default function ClassificationResults({ classification, onReset }: Class
         </div>
       )}
 
-      <div className="space-y-2">
-        <div>
-          <span className="font-medium">Category:</span> {parsedClassification.category || 'N/A'}
-        </div>
-        <div>
-          <span className="font-medium">Subcategory:</span> {parsedClassification.subcategory || 'N/A'}
-        </div>
-        <div className="mt-2">
-          <span className="font-medium">Properties:</span>
-          <ul className="ml-4">
-            <li>Brand: {parsedClassification.properties?.brand || 'N/A'}</li>
-            <li>Model: {parsedClassification.properties?.model || 'N/A'}</li>
-            <li>Condition: {parsedClassification.properties?.condition || 'N/A'}</li>
-          </ul>
+      <div className="space-y-4">
+        {/* Basic Information */}
+        <div className="space-y-2">
+          <div>
+            <span className="font-medium">Category:</span> {parsedClassification.category || 'N/A'}
+          </div>
+          <div>
+            <span className="font-medium">Subcategory:</span> {parsedClassification.subcategory || 'N/A'}
+          </div>
+          <div>
+            <span className="font-medium">Properties:</span>
+            <ul className="ml-4">
+              <li>Brand: {parsedClassification.properties?.brand || 'N/A'}</li>
+              <li>Model: {parsedClassification.properties?.model || 'N/A'}</li>
+              <li>Condition: {parsedClassification.properties?.condition || 'N/A'}</li>
+            </ul>
+          </div>
         </div>
         
-        {/* Suggested Location */}
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+        {/* Technical Details Section */}
+        {parsedClassification.technical_details && (
+          <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+            <h4 className="font-medium text-lg">Technical Details</h4>
+            
+            {/* Description */}
+            <div>
+              <h5 className="font-medium text-sm text-gray-600">Description:</h5>
+              <p className="mt-1">{parsedClassification.technical_details.description}</p>
+            </div>
+            
+            {/* Use Cases */}
+            {parsedClassification.technical_details.use_cases && (
+              <div>
+                <h5 className="font-medium text-sm text-gray-600">Common Use Cases:</h5>
+                <ul className="mt-1 list-disc list-inside">
+                  {parsedClassification.technical_details.use_cases.map((useCase: string, index: number) => (
+                    <li key={index} className="ml-4">{useCase}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Storage Location Section */}
+        <div className="p-4 bg-blue-50 rounded-lg">
           <div className="flex items-center justify-between">
             <span className="font-medium">Suggested Location:</span>
             {parsedClassification.alternative_locations && (
@@ -122,7 +143,7 @@ export default function ClassificationResults({ classification, onReset }: Class
               </div>
               {selectedLocation.reasoning && (
                 <div className="mt-1 text-sm text-gray-600">
-                  Reasoning: {selectedLocation.reasoning}
+                  <span className="font-medium">Reasoning:</span> {selectedLocation.reasoning}
                 </div>
               )}
             </div>
@@ -147,7 +168,7 @@ export default function ClassificationResults({ classification, onReset }: Class
                     </div>
                     {location.reasoning && (
                       <div className="mt-1 text-sm text-gray-600">
-                        Reasoning: {location.reasoning}
+                        <span className="font-medium">Reasoning:</span> {location.reasoning}
                       </div>
                     )}
                   </div>
@@ -158,7 +179,8 @@ export default function ClassificationResults({ classification, onReset }: Class
         </div>
       </div>
       
-      <div className="mt-4 flex justify-end space-x-2">
+      {/* Action Buttons */}
+      <div className="flex justify-end space-x-2">
         {storedStatus !== 'success' && (
           <button
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
