@@ -8,7 +8,8 @@ import ItemTechnicalDetails from './ItemTechnicalDetails';
 import ItemEditForm from './ItemEditForm';
 import ItemFilters from './ItemFilters';
 import { StoredItem, EditingItem } from '../types/itemTypes';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, Camera } from 'lucide-react';
+import CameraModal from '../common/CameraModal';
 
 const ScrollToTop = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -45,6 +46,7 @@ const ScrollToTop = () => {
 };
 
 export default function ItemList() {
+  // All useState declarations grouped together at the top
   const [items, setItems] = useState<StoredItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<StoredItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,6 +55,9 @@ export default function ItemList() {
   const [expandedItems, setExpandedItems] = useState<number[]>([]);
   const [availableLocations, setAvailableLocations] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>('');
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [selectedItemForCamera, setSelectedItemForCamera] = useState<number | null>(null);
 
   const fetchItems = async () => {
     try {
@@ -80,7 +85,6 @@ export default function ItemList() {
   };
 
   useEffect(() => {
-    // Initialize data
     Promise.all([
       fetchItems(),
       fetchLocations()
@@ -90,6 +94,45 @@ export default function ItemList() {
       setIsLoading(false);
     });
   }, []);
+
+  const handleImageCapture = async (image: string) => {
+    try {
+      if (!selectedItemForCamera) return;
+      
+      // Convert base64 image to blob
+      const response = await fetch(image);
+      const blob = await response.blob();
+      
+      // Create FormData
+      const formData = new FormData();
+      formData.append('image', blob, 'item.jpg');
+      
+      // Upload image
+      const uploadResponse = await axios.post('http://localhost:5000/api/images/upload', formData);
+      console.log('Upload response:', uploadResponse.data); // Debug log
+      
+      // Make sure we're using the correct path from the response
+      const imagePath = uploadResponse.data.filepath;
+      
+      console.log('Updating item with image path:', imagePath); // Debug log
+      
+      // Update item with new image path
+      const updateResponse = await axios.put(`http://localhost:5000/api/inventory/items/${selectedItemForCamera}`, {
+        image_path: imagePath
+      });
+      console.log('Update response:', updateResponse.data); // Debug log
+      
+      // Refresh items list
+      await fetchItems();
+      
+      setSelectedItemForCamera(null);
+      setCapturedImage(null);
+      setIsCameraOpen(false); // Close the modal after successful upload
+    } catch (error: any) {
+      console.error('Error updating image:', error);
+      setError(error.response?.data?.error || 'Error updating image');
+    }
+  };
 
   const handleFilters = ({ selectedCategories, selectedBrands, selectedModels }: {
     selectedCategories: string[];
@@ -240,6 +283,16 @@ export default function ItemList() {
 
                 <div className="flex justify-end space-x-2">
                   <button
+                    className="px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 flex items-center gap-1"
+                    onClick={() => {
+                      setSelectedItemForCamera(item.id);
+                      setIsCameraOpen(true);
+                    }}
+                  >
+                    <Camera size={16} />
+                    Update Picture
+                  </button>
+                  <button
                     className="px-3 py-1 bg-yellow-100 text-yellow-600 rounded hover:bg-yellow-200"
                     onClick={() => handleEdit(item)}
                   >
@@ -262,6 +315,11 @@ export default function ItemList() {
         ))}
       </div>
       <ScrollToTop />
+      <CameraModal
+        isOpen={isCameraOpen}
+        onClose={() => setIsCameraOpen(false)}
+        onImageCapture={handleImageCapture}
+      />
     </div>
   );
 }

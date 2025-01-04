@@ -7,6 +7,7 @@ from api.models.item import StoredItem
 from api.models.storage import StorageLevel1, StorageLevel2
 import logging
 
+
 inventory_bp = Blueprint('inventory', __name__)
 logger = logging.getLogger(__name__)
 
@@ -91,49 +92,62 @@ def get_item(item_id):
     finally:
         db.close()
 
+
+
+
 @inventory_bp.route('/items/<int:item_id>', methods=['PUT'])
 def update_item(item_id):
-    data = request.get_json()
-    db = SessionLocal()
-    
     try:
-        item = db.query(StoredItem).filter_by(id=item_id).first()
+        data = request.get_json()
+        current_app.logger.debug(f"Received update data: {data}")  # Debug log
+
+        db = SessionLocal()
+
+        item = db.query(StoredItem).filter(StoredItem.id == item_id).first()
         if not item:
             return jsonify({'error': 'Item not found'}), 404
-            
-        # Update basic fields
-        for field in ['category', 'subcategory', 'brand', 'model', 'condition', 'technical_description']:
-            if field in data:
-                setattr(item, field, data[field])
-                
-        # Update use cases if provided
+
+        # Just update the image path if that's all we got
+        if 'image_path' in data and len(data) == 1:
+            current_app.logger.debug(f"Updating only image path to: {data['image_path']}")
+            item.image_path = data['image_path']
+            db.commit()
+            return jsonify(item.to_dict())
+
+        # Otherwise handle full update
+        if 'category' in data:
+            item.category = data['category']
+        if 'subcategory' in data:
+            item.subcategory = data['subcategory']
+        if 'brand' in data:
+            item.brand = data['brand']
+        if 'model' in data:
+            item.model = data['model']
+        if 'condition' in data:
+            item.condition = data['condition']
+        if 'technical_description' in data:
+            item.technical_details = {
+                'description': data['technical_description']
+            }
         if 'use_cases' in data:
-            if item.technical_details is None:
-                item.technical_details = {}
-            item.technical_details['use_cases'] = data['use_cases']
-            
-        # Update location if provided
-        if data.get('selected_location'):
-            location = data['selected_location']
-            
-            # Find shelf
-            shelf = db.query(StorageLevel1).filter_by(name=location['shelf']).first()
-            if shelf:
-                item.shelf_id = shelf.id
-                
-                # Find container within this shelf
-                container = db.query(StorageLevel2).filter_by(
-                    shelf_id=shelf.id,
-                    name=location['container']
-                ).first()
-                if container:
-                    item.container_id = container.id
-                    
+            if isinstance(item.technical_details, dict):
+                item.technical_details['use_cases'] = data['use_cases']
+            else:
+                item.technical_details = {'use_cases': data['use_cases']}
+        if 'selected_location' in data and data['selected_location']:
+            item.shelf_id = data['selected_location'].get('shelf_id')
+            item.container_id = data['selected_location'].get('container_id')
+
         db.commit()
+
+        # Log the updated item details
+        current_app.logger.debug(f"Updated item {item_id}. Image path: {item.image_path}")
+
         return jsonify(item.to_dict())
-        
+
     except Exception as e:
         db.rollback()
+        current_app.logger.error(f"Error updating item: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 400
     finally:
         db.close()

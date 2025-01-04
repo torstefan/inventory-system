@@ -1,6 +1,5 @@
 // frontend/src/components/inventory/ItemBasicInfo.tsx
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StoredItem } from '../types/itemTypes';
 
 interface ItemBasicInfoProps {
@@ -9,6 +8,11 @@ interface ItemBasicInfoProps {
 
 export default function ItemBasicInfo({ item }: ItemBasicInfoProps) {
   const [imageError, setImageError] = useState(false);
+  
+  useEffect(() => {
+    // Reset image error state when item changes
+    setImageError(false);
+  }, [item.image_path]);
 
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     console.error('Image failed to load:', item.image_path);
@@ -26,7 +30,7 @@ export default function ItemBasicInfo({ item }: ItemBasicInfoProps) {
 
     // Construct the full image URL
     const imageUrl = `http://localhost:5000/static/${item.image_path}`;
-    console.log('Loading image from:', imageUrl); // Debug log
+    console.log('Attempting to load image from:', imageUrl); // Debug log
 
     return (
       <img
@@ -37,6 +41,8 @@ export default function ItemBasicInfo({ item }: ItemBasicInfoProps) {
       />
     );
   };
+
+  console.log('ItemBasicInfo render - image_path:', item.image_path); // Debug log
 
   return (
     <div className="flex space-x-4">
