@@ -1,4 +1,5 @@
 // frontend/src/components/inventory/ClassificationResults.tsx
+
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Classification } from './types';
@@ -36,7 +37,7 @@ export default function ClassificationResults({ classification, onReset }: Class
       setStoredStatus('pending');
       setStatusMessage('Storing item...');
 
-      // Updated itemData structure to properly include technical details
+      // Updated itemData structure to properly include technical details and image path
       const itemData = {
         category: parsedClassification.category,
         subcategory: parsedClassification.subcategory,
@@ -51,7 +52,8 @@ export default function ClassificationResults({ classification, onReset }: Class
           shelf: selectedLocation.shelf,
           container: selectedLocation.container,
           reasoning: selectedLocation.reasoning
-        } : null
+        } : null,
+        image_path: parsedClassification.image_path // Add the image path
       };
 
       console.log('Storing item with data:', itemData); // Debug log

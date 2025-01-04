@@ -1,9 +1,12 @@
-from flask import Blueprint, request, jsonify, current_app
+# backend/api/routes/image_routes.py
+
+from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from werkzeug.utils import secure_filename
 import os
 import sys
 import json
 from pathlib import Path
+import uuid
 
 # Add the backend directory to the Python path
 backend_dir = Path(__file__).resolve().parent.parent.parent
@@ -14,9 +17,22 @@ from llm.processors.image_processor import ImageProcessor
 image_bp = Blueprint('image', __name__)
 processor = ImageProcessor()
 
-UPLOAD_FOLDER = 'static/uploads'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+# Define absolute paths
+BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+STATIC_DIR = BACKEND_DIR / 'static'
+UPLOAD_DIR = STATIC_DIR / 'uploads'
+
+# Create directories if they don't exist
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+def generate_unique_filename(original_filename):
+    """Generate a unique filename while preserving the original extension."""
+    ext = os.path.splitext(original_filename)[1]
+    return f"{uuid.uuid4()}{ext}"
+
+@image_bp.route('/static/uploads/<path:filename>')
+def serve_image(filename):
+    return send_from_directory(str(UPLOAD_DIR), filename)
 
 @image_bp.route('/upload', methods=['POST'])
 def upload_image():
@@ -32,21 +48,32 @@ def upload_image():
             current_app.logger.warning("Empty filename received")
             return jsonify({'error': 'No selected file'}), 400
         
-        # Save the uploaded file
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        # Generate a unique filename
+        filename = generate_unique_filename(secure_filename(file.filename))
+        filepath = UPLOAD_DIR / filename
+        
         current_app.logger.debug(f"Saving file to: {filepath}")
         file.save(filepath)
         
+        # Verify file was saved
+        if not filepath.exists():
+            raise Exception(f"Failed to save file at {filepath}")
+        
+        # Log file permissions
+        current_app.logger.debug(f"File permissions: {oct(filepath.stat().st_mode)[-3:]}")
+        
         # Process the image with GPT-4 Vision
         current_app.logger.info("Processing image with GPT-4 Vision")
-        classification = processor.process_image(filepath)
+        classification = processor.process_image(str(filepath))
         
-        # The classification is already a dict, no need to parse it
-        current_app.logger.info("Image processed successfully")
+        # Update the image path to include the uploads directory
+        image_path = f'uploads/{filename}'
+        classification['image_path'] = image_path
+        
+        current_app.logger.info(f"Image processed successfully. Path: {image_path}")
         return jsonify({
             'message': 'Image processed successfully',
-            'filepath': filepath,
+            'filepath': image_path,
             'classification': classification
         })
         

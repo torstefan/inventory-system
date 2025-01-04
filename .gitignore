@@ -7,6 +7,7 @@ setup_backend.sh
 setup_components.sh
 backend/static/uploads/*
 backend/debug.log
+debug.log
 
 # Python
 __pycache__/

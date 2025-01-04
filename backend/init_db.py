@@ -1,15 +1,23 @@
-# backend/init_db.py
-from database.db import engine, Base
+from database.db import Base, engine
+from api.models.storage import StorageLevel1, StorageLevel2, StorageLevel3, ContainerType
 from api.models.item import StoredItem
-from api.models.storage import StorageLevel1, StorageLevel2, StorageLevel3
+from api.routes.storage_init import init_storage
 
-def init_db():
+def init_database():
     print("Creating database tables...")
-    # Drop all existing tables
-    Base.metadata.drop_all(bind=engine)
     # Create all tables
     Base.metadata.create_all(bind=engine)
-    print("Database tables created successfully!")
+    print("Database tables created successfully")
+    
+    # Initialize storage locations
+    print("Initializing storage locations...")
+    try:
+        if init_storage():
+            print("Storage locations initialized successfully")
+        else:
+            print("Storage locations already exist")
+    except Exception as e:
+        print(f"Error initializing storage: {str(e)}")
 
 if __name__ == "__main__":
-    init_db()
+    init_database()
