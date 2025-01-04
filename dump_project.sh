@@ -13,6 +13,7 @@ Last updated: January 04, 2025
 - Full CRUD operations for storage locations
 - Automatic storage initialization with default structure
 - Location suggestions based on item type
+- Edit and delete functionality for storage locations
 
 ### Item Management
 - Multi-modal item registration
@@ -21,6 +22,7 @@ Last updated: January 04, 2025
     - V4L2 integration for precise control
     - Macro mode for close-up shots (3cm)
     - Focus settings persistence
+    - Multi-device support
   - Text description input
   - Image processing via GPT-4o
   - Text processing via GPT-4
@@ -31,22 +33,30 @@ Last updated: January 04, 2025
   - Usage descriptions
   - Storage location tracking
   - Image storage and display
+  - Last modified tracking
+- Advanced filtering system
+  - Category filters (OR logic)
+  - Brand filters (AND logic)
+  - Model filters (AND logic)
+  - Filter state persistence
+  - Filter count indicators
+  - Clear filters option
 - Item list view with expandable details
 - Edit and delete functionality
 - Location tracking and management
 
-### Search System
-- Live search functionality with 3+ characters
-- Search across multiple fields:
-  - Category and subcategory
-  - Brand and model
-  - Technical descriptions
-  - Use cases
-- Debounced search to prevent excessive API calls
-- Real-time results display
-- Expandable search results
-- Loading states and error handling
-- Search result count display
+### Data Management
+- Complete system backup
+  - Database records
+  - Uploaded images
+  - Storage structure
+  - Metadata
+- System restore functionality
+  - Atomic restore operations
+  - Data validation
+  - Relationship preservation
+- CLI support for backup/restore
+- GUI interface for data operations
 
 ### Camera Features
 - Manual focus control via V4L2
@@ -64,86 +74,93 @@ Last updated: January 04, 2025
 - Loading states
 - Error handling
 - Image preview
-- Search feedback and instructions
+- Filter feedback and instructions
+- Consistent container widths
+- State persistence across sessions
 
 ## Planned Features 📋
 
-### Search Improvements
-- Filters (category, date, location)
-- Sorting options (newest, alphabetical)
-- Search history
-- Export search results
-- Fuzzy matching
-- Advanced filtering UI
+### Search System Enhancements
+- Search within filtered results
+- Advanced filter combinations
+- Filter presets
+- Filter history
+- Saved searches
+- Export filtered results
 
 ### Batch Operations
 - Bulk item import
 - Batch updates
 - Mass relocations
 - Bulk delete with confirmation
+- CSV import/export
 
-### Analytics
+### Analytics Dashboard
 - Storage utilization metrics
 - Category distribution
-- Location optimization
+- Location optimization suggestions
 - Item movement tracking
 - Search pattern analysis
 - Popular items tracking
+- Filter usage statistics
 
 ### UI Enhancements
-- Dark mode
+- Dark mode support
 - List/grid view toggle
 - Customizable columns
 - Keyboard shortcuts
 - Drag-and-drop organization
-- Search filters panel
+- Sort by any field
 - Advanced search interface
-
-### Export/Import
-- CSV export
-- JSON data backup
-- Bulk import templates
-- Data migration tools
-- Search results export
+- Bulk action menu
 
 ### Item History
-- Location history
-- Modification tracking
-- Usage logs
+- Location history tracking
+- Modification logs
+- Usage tracking
 - Check-out system
-- Search history
+- Audit trail
+
+### Reporting
+- Custom report builder
+- Export in multiple formats
+- Scheduled reports
+- Email notifications
+- Usage statistics
+- Inventory reports
 
 ## Known Issues 🐛
-1. Need better error handling for network connectivity issues
-2. Some browser compatibility issues with camera functions
+1. Filter combinations can be slow with large datasets
+2. Browser compatibility issues with certain camera functions
 3. Large image uploads need optimization
-4. Need better error messages for GPT processing failures
+4. Need better error messages for API failures
 5. Location selector can be slow with many locations
 6. Search performance could be improved for large datasets
 
 ## Technical Debt
-1. Need test coverage
-2. Improve error handling
+1. Need comprehensive test coverage
+2. API documentation needs updating
 3. Performance optimization for image processing
-4. Code documentation
-5. API versioning
-6. Search query optimization
-7. Better type safety in frontend components
+4. Code documentation improvements
+5. Type safety enhancements
+6. Error handling standardization
+7. Search query optimization
+8. React component restructuring
 
 ## Next Steps (Prioritized)
-1. Implement search filters
-2. Add sorting capabilities to search
-3. Add export functionality
-4. Improve error handling
-5. Add batch operations
-6. Implement dark mode
-7. Add keyboard shortcuts
+1. Implement search within filtered results
+2. Add sorting capabilities
+3. Improve filter performance
+4. Add batch operations
+5. Implement dark mode
+6. Add keyboard shortcuts
+7. Create analytics dashboard
 
 ## Environment Requirements
 - Python 3.11+
 - Node.js 18+
 - SQLite 3.40+
-- OpenAI API key
+- OpenAI API key with GPT-4V access
 - Webcam with V4L2 support
 - v4l2-ctl utility installed
 - Modern web browser with JavaScript enabled

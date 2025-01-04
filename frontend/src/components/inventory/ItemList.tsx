@@ -1,3 +1,4 @@
+// frontend/src/components/inventory/ItemList.tsx
 'use client'
 
 import React, { useEffect, useState } from 'react';
@@ -7,6 +8,41 @@ import ItemTechnicalDetails from './ItemTechnicalDetails';
 import ItemEditForm from './ItemEditForm';
 import ItemFilters from './ItemFilters';
 import { StoredItem, EditingItem } from '../types/itemTypes';
+import { ArrowUp } from 'lucide-react';
+
+const ScrollToTop = () => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const toggleVisibility = () => {
+      setIsVisible(window.pageYOffset > 300);
+    };
+
+    window.addEventListener('scroll', toggleVisibility);
+    return () => window.removeEventListener('scroll', toggleVisibility);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  };
+
+  return (
+    <>
+      {isVisible && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-8 right-8 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
+          aria-label="Scroll to top"
+        >
+          <ArrowUp size={24} />
+        </button>
+      )}
+    </>
+  );
+};
 
 export default function ItemList() {
   const [items, setItems] = useState<StoredItem[]>([]);
@@ -62,15 +98,12 @@ export default function ItemList() {
   }) => {
     let filtered = [...items];
 
-    // Filter by categories (OR logic between categories)
     if (selectedCategories.length > 0) {
       filtered = filtered.filter(item => selectedCategories.includes(item.category));
     }
 
-    // Filter by brands (AND logic between brands)
     if (selectedBrands.length > 0) {
       filtered = filtered.filter(item => {
-        // Handle both cases where brand might be a single brand or a comma-separated list
         const itemBrands = item.brand ? item.brand.split(',').map(b => b.trim()) : [];
         return selectedBrands.every(selectedBrand => 
           selectedBrand === 'Unknown' 
@@ -80,7 +113,6 @@ export default function ItemList() {
       });
     }
 
-    // Filter by models (AND logic between models)
     if (selectedModels.length > 0) {
       filtered = filtered.filter(item => {
         const itemModels = item.model ? item.model.split(',').map(m => m.trim()) : [];
@@ -229,6 +261,7 @@ export default function ItemList() {
           </div>
         ))}
       </div>
+      <ScrollToTop />
     </div>
   );
 }
