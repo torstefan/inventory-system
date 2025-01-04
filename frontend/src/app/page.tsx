@@ -5,9 +5,10 @@ import React, { useState } from 'react';
 import InventorySystem from '@/components/inventory/InventorySystem';
 import StorageManagement from '@/components/storage/StorageManagement';
 import DataManagement from '@/components/DataManagement';
+import ItemList from '@/components/inventory/ItemList';
 
 export default function Home() {
-  const [currentView, setCurrentView] = useState<'inventory' | 'storage' | 'data'>('inventory');
+  const [currentView, setCurrentView] = useState<'list' | 'inventory' | 'storage' | 'data'>('list');
 
   return (
     <main className="min-h-screen">
@@ -17,13 +18,23 @@ export default function Home() {
           <div className="flex space-x-4 h-14">
             <button
               className={`inline-flex items-center px-4 h-full border-b-2 ${
+                currentView === 'list'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+              onClick={() => setCurrentView('list')}
+            >
+              Items
+            </button>
+            <button
+              className={`inline-flex items-center px-4 h-full border-b-2 ${
                 currentView === 'inventory'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
               onClick={() => setCurrentView('inventory')}
             >
-              Inventory
+              Register Item
             </button>
             <button
               className={`inline-flex items-center px-4 h-full border-b-2 ${
@@ -49,8 +60,9 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Content */}
-      <div className="py-6">
+      {/* Content Container */}
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {currentView === 'list' && <ItemList />}
         {currentView === 'inventory' && <InventorySystem />}
         {currentView === 'storage' && <StorageManagement />}
         {currentView === 'data' && <DataManagement />}
