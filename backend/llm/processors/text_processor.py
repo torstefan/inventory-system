@@ -1,11 +1,14 @@
 import os
-import logging
 from openai import OpenAI
 from dotenv import load_dotenv
+import logging
+import httpx
 import json
-import re
+from database.db import SessionLocal
+from api.models.storage import StorageLevel1
 
 logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 class TextProcessor:
@@ -15,117 +18,117 @@ class TextProcessor:
             logger.error("OPENAI_API_KEY not found in environment variables")
             raise ValueError("OPENAI_API_KEY not found in environment variables")
             
-        self.client = OpenAI(api_key=api_key)
-        self.model = "gpt-4"  # or whatever model you prefer
+        http_client = httpx.Client(
+            base_url="https://api.openai.com/v1",
+            headers={"Authorization": f"Bearer {api_key}"}
+        )
+        
+        self.client = OpenAI(
+            api_key=api_key,
+            http_client=http_client
+        )
+        
+        self.text_model = os.getenv('OPENAI_TEXT_MODEL', 'gpt-4')
+
+    def get_storage_structure(self):
+        db = SessionLocal()
+        try:
+            shelves = db.query(StorageLevel1).all()
+            storage_info = []
+            for shelf in shelves:
+                shelf_info = {
+                    "shelf_name": shelf.name,
+                    "shelf_description": shelf.description,
+                    "containers": []
+                }
+                for container in shelf.containers:
+                    shelf_info["containers"].append({
+                        "name": container.name,
+                        "type": container.container_type.value,
+                        "description": container.description
+                    })
+                storage_info.append(shelf_info)
+            return storage_info
+        finally:
+            db.close()
 
     def clean_json_string(self, json_str: str) -> str:
-        """Extract and clean JSON from the response string."""
-        # Try to find JSON block within markdown
-        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', json_str, re.DOTALL)
-        if json_match:
-            return json_match.group(1).strip()
-        
-        # If no markdown blocks, try to find just a JSON object
-        json_match = re.search(r'(\{.*\})', json_str, re.DOTALL)
-        if json_match:
-            return json_match.group(1).strip()
-        
-        # If no JSON found, return the original string
+        # Remove markdown code blocks
+        json_str = json_str.replace('```json', '').replace('```', '')
+        # Remove any leading/trailing whitespace
         return json_str.strip()
 
     def process_text(self, description: str):
-        """Process text description of an item."""
         try:
-            logger.info("Processing text description")
+            logger.info(f"Processing text description: {description}")
             
-            # Get storage structure (you might want to implement this)
-            storage_info = []  # Implement getting storage structure
-            
-            prompt = f"""You are a JSON API. Respond only with a valid JSON object, no other text. Analyze this item description:
-            1. Category and identification
-            2. Key features from the description
-            3. A detailed technical description of what this item is
-            4. Common use cases and applications
-            5. Suggest the best storage location based on this storage structure:
-            {json.dumps(storage_info, indent=2)}
+            storage_info = self.get_storage_structure()
+            storage_context = json.dumps(storage_info, indent=2)
 
-            Item description: {description}
+            system_prompt = """You are a helpful assistant that analyzes electronic component descriptions and returns structured data about them. 
+Always respond with valid JSON data following the exact structure provided."""
+
+            prompt = f"""Analyze this electronic component description and provide information in JSON format:
+            Description: {description}
+            
+            Available Storage Locations:
+            {storage_context}
 
             IMPORTANT: 
-            - You must suggest at least 2 alternative locations from different shelves if available
-            - Each location suggestion must include clear reasoning
-            - Consider the item type and characteristics when suggesting locations
-            - Provide comprehensive technical details and use cases
+            - Return only valid JSON data
+            - Provide comprehensive technical details
+            - List multiple common use cases
+            - Suggest at least 2 alternative locations from different shelves
+            - Include clear reasoning for location suggestions
+            - Match location names exactly as provided in the storage structure
 
-            Format the response as a clean JSON:
+            Return your response in this exact JSON structure:
             {{
-                "category": "semiconductor",
-                "subcategory": "transistor",
+                "category": "component category",
+                "subcategory": "specific type",
                 "properties": {{
-                    "brand": "manufacturer name if known",
-                    "model": "2N3906",
-                    "condition": "new/used/etc"
+                    "brand": "manufacturer if mentioned",
+                    "model": "model number if mentioned",
+                    "condition": "condition if mentioned"
                 }},
                 "technical_details": {{
-                    "description": "A detailed technical description of what this item is",
+                    "description": "comprehensive technical description",
                     "use_cases": [
-                        "List of common applications and use cases",
-                        "Each as a separate string in the array"
+                        "use case 1",
+                        "use case 2"
                     ]
                 }},
                 "suggested_location": {{
-                    "shelf": "shelf name",
-                    "container": "container name",
-                    "reasoning": "Explain why this is the best location"
+                    "shelf": "exact shelf name from structure",
+                    "container": "exact container name",
+                    "reasoning": "detailed explanation"
                 }},
                 "alternative_locations": [
                     {{
-                        "shelf": "Different shelf name",
-                        "container": "Different container name",
-                        "reasoning": "Explain why this is a good alternative"
+                        "shelf": "different shelf name",
+                        "container": "container name",
+                        "reasoning": "explanation"
                     }}
                 ]
-            }}
-
-            Make sure to use actual shelf and container names from the provided storage structure."""
+            }}"""
 
             response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
+                model=self.text_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
                 max_tokens=1000
             )
             
-            # Get the response content
             response_content = response.choices[0].message.content
+            logger.debug(f"Raw response content: {response_content}")
             
-            # Clean the response
             cleaned_json = self.clean_json_string(response_content)
+            logger.debug(f"Cleaned JSON: {cleaned_json}")
             
-            # Log the cleaned response for debugging
-            logger.debug(f"Cleaned response: {cleaned_json}")
+            return json.loads(cleaned_json)
             
-            # Parse the JSON
-            try:
-                parsed_json = json.loads(cleaned_json)
-                return parsed_json
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON parsing error: {str(e)}")
-                logger.error(f"Failed to parse JSON: {cleaned_json}")
-                # Return a basic structured response instead of failing
-                return {
-                    "category": "semiconductor",
-                    "subcategory": "transistor",
-                    "properties": {
-                        "model": description,
-                        "brand": "Unknown",
-                        "condition": "Unknown"
-                    },
-                    "technical_details": {
-                        "description": "Error processing description",
-                        "use_cases": ["Error retrieving use cases"]
-                    }
-                }
-                
         except Exception as e:
             logger.error(f"Error in process_text: {str(e)}", exc_info=True)
             raise

@@ -3,6 +3,7 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 from api.routes import register_routes
+from api.routes.storage_init import init_bp  # Add this line
 import logging
 import sys
 
@@ -44,8 +45,11 @@ def home():
         'message': 'Inventory System API is running'
     })
 
-# Register other routes
+# Register routes
 register_routes(app)
+
+# Register the initialization blueprint
+app.register_blueprint(init_bp, url_prefix='/api')  # Add this line
 
 if __name__ == '__main__':
     app.run(debug=True)
