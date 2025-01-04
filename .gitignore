@@ -8,6 +8,7 @@ setup_components.sh
 backend/static/uploads/*
 backend/debug.log
 debug.log
+backend/static/inventory_backup*
 
 # Python
 __pycache__/
