@@ -1,0 +1,98 @@
+# Camera Controls Documentation
+
+## V4L2 Controls for /dev/video0
+
+### User Controls
+- brightness (0x00980900)
+  - Type: int
+  - Range: min=30 max=255
+  - Step: 1
+  - Default: 133
+
+- contrast (0x00980901)
+  - Type: int
+  - Range: min=0 max=10
+  - Step: 1
+  - Default: 5
+
+- saturation (0x00980902)
+  - Type: int
+  - Range: min=0 max=200
+  - Step: 1
+  - Default: 103
+
+- white_balance_automatic (0x0098090c)
+  - Type: bool
+  - Default: 1
+
+- power_line_frequency (0x00980918)
+  - Type: menu
+  - Range: min=0 max=2
+  - Default: 2
+  - Values: 1 (50 Hz)
+
+- white_balance_temperature (0x0098091a)
+  - Type: int
+  - Range: min=2500 max=10000
+  - Step: 1
+  - Default: 4500
+  - Flags: inactive
+
+- sharpness (0x0098091b)
+  - Type: int
+  - Range: min=0 max=50
+  - Step: 1
+  - Default: 25
+
+- backlight_compensation (0x0098091c)
+  - Type: int
+  - Range: min=0 max=10
+  - Step: 1
+  - Default: 0
+
+### Camera Controls
+- auto_exposure (0x009a0901)
+  - Type: menu
+  - Range: min=0 max=3
+  - Default: 3
+  - Value: 3 (Aperture Priority Mode)
+
+- exposure_time_absolute (0x009a0902)
+  - Type: int
+  - Range: min=1 max=10000
+  - Step: 1
+  - Default: 156
+  - Flags: inactive
+
+- pan_absolute (0x009a0908)
+  - Type: int
+  - Range: min=-529200 max=529200
+  - Step: 3600
+  - Default: 0
+
+- tilt_absolute (0x009a0909)
+  - Type: int
+  - Range: min=-432000 max=432000
+  - Step: 3600
+  - Default: 0
+
+- focus_absolute (0x009a090a)
+  - Type: int
+  - Range: min=0 max=40
+  - Step: 1
+  - Default: 0
+
+- focus_automatic_continuous (0x009a090c)
+  - Type: bool
+  - Default: 1
+
+- zoom_absolute (0x009a090d)
+  - Type: int
+  - Range: min=0 max=317
+  - Step: 1
+  - Default: 0
+
+## Usage Notes
+- Obtained using command: `v4l2-ctl -d /dev/video0 --list-ctrls`
+- For focus control in manual mode, use: `v4l2-ctl -d /dev/video0 --set-ctrl=focus_absolute=<value>`
+- Best focus for close-up shots (3cm) is around value 40

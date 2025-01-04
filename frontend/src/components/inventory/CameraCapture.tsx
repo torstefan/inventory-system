@@ -1,3 +1,7 @@
+// frontend/src/components/inventory/CameraCapture.tsx
+// Camera component with V4L2 focus control support for Devuan Linux
+// Focus range based on v4l2-ctl -d /dev/video0 --list-ctrls documentation
+
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -12,6 +16,40 @@ const CAMERA_PREFERENCE_KEY = 'preferred-camera-id';
 const FOCUS_MODE_KEY = 'preferred-focus-mode';
 const FOCUS_DISTANCE_KEY = 'preferred-focus-distance';
 
+// Camera control constants based on v4l2 documentation
+const FOCUS_CONTROL = {
+  MIN: 0,
+  MAX: 40,
+  STEP: 1,
+  DEFAULT: 0,
+  MACRO: 40  // Value for close-up shots (3cm)
+};
+
+// Call v4l2-ctl command through a backend endpoint
+const setV4L2Focus = async (devicePath: string, focusValue: number) => {
+  try {
+    const response = await fetch('http://localhost:5000/api/camera/set-focus', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        device: devicePath,
+        focus: focusValue
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to set focus');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error setting focus:', error);
+    throw error;
+  }
+};
+
 export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
   const [videoDevices, setVideoDevices] = useState<VideoDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>('');
@@ -19,14 +57,10 @@ export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
     localStorage.getItem(FOCUS_MODE_KEY) as 'auto' | 'manual' || 'auto'
   );
   const [focusDistance, setFocusDistance] = useState<number>(() => 
-    Number(localStorage.getItem(FOCUS_DISTANCE_KEY)) || 0
+    Number(localStorage.getItem(FOCUS_DISTANCE_KEY)) || 40  // Default to 40 as per your command
   );
-  const [focusCapabilities, setFocusCapabilities] = useState<{
-    supported: boolean;
-    min?: number;
-    max?: number;
-    step?: number;
-  }>({ supported: true, min: 0, max: 1, step: 0.1 });
+  const [devicePath, setDevicePath] = useState<string>('/dev/video0');
+  const [error, setError] = useState<string | null>(null);
   
   const webcamRef = useRef<Webcam>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -37,9 +71,10 @@ export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoInputs = devices
           .filter(device => device.kind === 'videoinput')
-          .map(device => ({
+          .map((device, index) => ({
             deviceId: device.deviceId,
-            label: device.label || `Camera ${device.deviceId.slice(0, 5)}...`
+            label: device.label || `Camera ${index}`,
+            path: `/dev/video${index}` // Assuming the device order matches v4l2
           }));
         
         setVideoDevices(videoInputs);
@@ -48,29 +83,33 @@ export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
         const deviceIdToUse = preferredCameraId && 
           videoInputs.some(device => device.deviceId === preferredCameraId)
           ? preferredCameraId
-          : videoInputs.length > 1 
-            ? videoInputs[1].deviceId 
-            : videoInputs[0]?.deviceId;
+          : videoInputs[0]?.deviceId;
 
         if (deviceIdToUse) {
           setSelectedDevice(deviceIdToUse);
+          const selectedVideoDevice = videoInputs.find(d => d.deviceId === deviceIdToUse);
+          if (selectedVideoDevice) {
+            setDevicePath(selectedVideoDevice.path);
+          }
           localStorage.setItem(CAMERA_PREFERENCE_KEY, deviceIdToUse);
 
-          // Initialize the stream with saved focus preferences
+          // Initialize the stream
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               deviceId: deviceIdToUse,
-              advanced: [{
-                focusMode: focusMode,
-                focusDistance: focusMode === 'manual' ? focusDistance : undefined
-              }]
             }
           });
           
           streamRef.current = stream;
+
+          // Set initial focus based on stored mode
+          if (focusMode === 'manual') {
+            await setV4L2Focus(selectedVideoDevice?.path || '/dev/video0', focusDistance);
+          }
         }
       } catch (err) {
         console.error('Error initializing camera:', err);
+        setError('Error initializing camera. Please check permissions.');
       }
     };
 
@@ -78,83 +117,67 @@ export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
   }, []);
 
   const handleDeviceSelect = async (deviceId: string) => {
-    setSelectedDevice(deviceId);
-    localStorage.setItem(CAMERA_PREFERENCE_KEY, deviceId);
-    
-    // Check focus capabilities when device changes
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          deviceId,
-          advanced: [{
-            focusMode: 'manual',
-            focusDistance: 0
-          }]
-        }
-      });
+      setSelectedDevice(deviceId);
+      localStorage.setItem(CAMERA_PREFERENCE_KEY, deviceId);
       
-      const videoTrack = stream.getVideoTracks()[0];
-      const capabilities = videoTrack.getCapabilities();
-      console.log('Camera capabilities:', capabilities);
-      
-      // Force enable focus controls even if not reported as supported
-      setFocusCapabilities({
-        supported: true,
-        min: capabilities.focusDistance?.min || 0,
-        max: capabilities.focusDistance?.max || 1,
-        step: capabilities.focusDistance?.step || 0.1
-      });
+      const selectedVideoDevice = videoDevices.find(d => d.deviceId === deviceId);
+      if (selectedVideoDevice) {
+        setDevicePath(selectedVideoDevice.path);
+      }
 
-      streamRef.current = stream;
-    } catch (error) {
-      console.error('Error checking focus capabilities:', error);
-      // Still show controls even if check fails
-      setFocusCapabilities({
-        supported: true,
-        min: 0,
-        max: 1,
-        step: 0.1
+      // Get new stream for selected device
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId }
       });
+      
+      streamRef.current = stream;
+
+      // Apply current focus settings to new device
+      if (focusMode === 'manual') {
+        await setV4L2Focus(selectedVideoDevice?.path || '/dev/video0', focusDistance);
+      }
+      
+      setError(null);
+    } catch (error) {
+      console.error('Error changing device:', error);
+      setError('Failed to switch camera device');
     }
   };
 
   const handleFocusModeChange = async (mode: 'auto' | 'manual') => {
-    setFocusMode(mode);
-    localStorage.setItem(FOCUS_MODE_KEY, mode);
-    
-    if (!streamRef.current) return;
-
-    const videoTrack = streamRef.current.getVideoTracks()[0];
     try {
-      await videoTrack.applyConstraints({
-        advanced: [{
-          focusMode: mode,
-          focusDistance: mode === 'manual' ? focusDistance : undefined
-        }]
-      });
-      console.log('Applied focus mode:', mode);
+      setFocusMode(mode);
+      localStorage.setItem(FOCUS_MODE_KEY, mode);
+      
+      if (mode === 'manual') {
+        await setV4L2Focus(devicePath, focusDistance);
+      } else {
+        // For auto mode, set a very high value that triggers auto-focus
+        await setV4L2Focus(devicePath, 0);
+      }
+      
+      setError(null);
     } catch (error) {
       console.error('Error changing focus mode:', error);
+      setError('Failed to change focus mode');
     }
   };
 
   const handleFocusDistanceChange = async (distance: number) => {
-    console.log('Setting focus distance:', distance);
-    setFocusDistance(distance);
-    localStorage.setItem(FOCUS_DISTANCE_KEY, String(distance));
-    
-    if (!streamRef.current || focusMode !== 'manual') return;
-
-    const videoTrack = streamRef.current.getVideoTracks()[0];
     try {
-      await videoTrack.applyConstraints({
-        advanced: [{
-          focusDistance: distance
-        }]
-      });
-      console.log('Applied focus distance:', distance);
+      console.log('Setting focus distance:', distance);
+      setFocusDistance(distance);
+      localStorage.setItem(FOCUS_DISTANCE_KEY, String(distance));
+      
+      if (focusMode === 'manual') {
+        await setV4L2Focus(devicePath, distance);
+      }
+      
+      setError(null);
     } catch (error) {
       console.error('Error changing focus distance:', error);
+      setError('Failed to set focus distance');
     }
   };
 
@@ -167,6 +190,12 @@ export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="bg-red-100 text-red-700 p-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
       {videoDevices.length > 0 && (
         <select
           className="w-full p-2 border rounded-lg bg-white"
@@ -181,43 +210,54 @@ export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
         </select>
       )}
       
-      {focusCapabilities.supported && (
-        <div className="space-y-2">
-          <div className="flex items-center space-x-4">
-            <label className="flex items-center space-x-2">
-              <input
-                type="radio"
-                checked={focusMode === 'auto'}
-                onChange={() => handleFocusModeChange('auto')}
-              />
-              <span>Auto Focus</span>
-            </label>
-            <label className="flex items-center space-x-2">
-              <input
-                type="radio"
-                checked={focusMode === 'manual'}
-                onChange={() => handleFocusModeChange('manual')}
-              />
-              <span>Manual Focus</span>
-            </label>
-          </div>
-          
-          {focusMode === 'manual' && focusCapabilities.min !== undefined && focusCapabilities.max !== undefined && (
-            <div className="flex items-center space-x-2">
-              <span>Focus Distance:</span>
-              <input
-                type="range"
-                min={focusCapabilities.min}
-                max={focusCapabilities.max}
-                step={focusCapabilities.step || 0.1}
-                value={focusDistance}
-                onChange={(e) => handleFocusDistanceChange(Number(e.target.value))}
-                className="flex-grow"
-              />
-            </div>
-          )}
+      <div className="space-y-2">
+        <div className="flex items-center space-x-4">
+          <label className="flex items-center space-x-2">
+            <input
+              type="radio"
+              checked={focusMode === 'auto'}
+              onChange={() => handleFocusModeChange('auto')}
+            />
+            <span>Auto Focus</span>
+          </label>
+          <label className="flex items-center space-x-2">
+            <input
+              type="radio"
+              checked={focusMode === 'manual'}
+              onChange={() => handleFocusModeChange('manual')}
+            />
+            <span>Manual Focus</span>
+          </label>
         </div>
-      )}
+        
+	{focusMode === 'manual' && (
+	  <div className="space-y-2">
+	    <div className="flex items-center space-x-2">
+	      <span>Focus Distance:</span>
+	      <input
+		type="range"
+		min={FOCUS_CONTROL.MIN}
+		max={FOCUS_CONTROL.MAX}
+		step={FOCUS_CONTROL.STEP}
+		value={focusDistance}
+		onChange={(e) => handleFocusDistanceChange(Number(e.target.value))}
+		className="flex-grow"
+	      />
+	      <span className="w-12 text-center">{focusDistance}</span>
+	    </div>
+	    <div className="flex justify-between text-sm text-gray-500">
+	      <span>Far</span>
+	      <span>Close (3cm)</span>
+	    </div>
+	    <button
+	      className="w-full px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+	      onClick={() => handleFocusDistanceChange(FOCUS_CONTROL.MACRO)}
+	    >
+	      Set Macro Focus (3cm)
+	    </button>
+	  </div>
+	)}
+      </div>
       
       <div className="relative">
         <Webcam
@@ -225,11 +265,7 @@ export default function CameraCapture({ onImageCapture }: CameraCaptureProps) {
           ref={webcamRef}
           screenshotFormat="image/jpeg"
           videoConstraints={{
-            deviceId: selectedDevice,
-            advanced: [{
-              focusMode: focusMode,
-              focusDistance: focusMode === 'manual' ? focusDistance : undefined
-            }]
+            deviceId: selectedDevice
           }}
           className="w-full rounded-lg"
         />
