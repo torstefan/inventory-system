@@ -57,6 +57,22 @@ class ImageProcessor:
         finally:
             db.close()
 
+    def encode_image(self, image_path):
+        try:
+            with open(image_path, "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode('utf-8')
+        except Exception as e:
+            logger.error(f"Error encoding image: {str(e)}", exc_info=True)
+            raise
+
+    def clean_json_string(self, json_str: str) -> str:
+        """Clean the JSON string by removing markdown code blocks and other formatting."""
+        # Remove markdown code blocks
+        json_str = re.sub(r'```json\s*', '', json_str)
+        json_str = re.sub(r'```\s*$', '', json_str)
+        # Remove any leading/trailing whitespace
+        return json_str.strip()
+
     def process_image(self, image_path):
         try:
             logger.info(f"Processing image: {image_path}")
@@ -74,41 +90,53 @@ class ImageProcessor:
 
             # Prepare the prompt for GPT-4 Vision
             storage_context = json.dumps(storage_info, indent=2)
-            prompt = f"""Analyze this electronic component image and provide:
+            prompt = f"""Analyze this electronic component image and provide detailed information including:
             1. Category and identification
             2. Key features visible in the image
-            3. Suggest the best storage location based on this storage structure:
+            3. Technical details and characteristics
+            4. Common use cases and applications
+            5. Suggest the best storage location based on this storage structure:
             {storage_context}
 
             IMPORTANT: 
+            - Provide comprehensive technical details
+            - List multiple common use cases
             - You must suggest at least 2 alternative locations from different shelves if available
             - Each location suggestion must include clear reasoning
             - Consider the component type and characteristics when suggesting locations
 
             Format the response as a clean JSON:
             {{
-                "category": "",
-                "subcategory": "",
+                "category": "component category",
+                "subcategory": "specific type",
                 "properties": {{
-                    "brand": "",
-                    "model": "",
-                    "condition": ""
+                    "brand": "manufacturer if visible",
+                    "model": "model number",
+                    "condition": "physical condition"
+                }},
+                "technical_details": {{
+                    "description": "A comprehensive technical description of the component including specifications and characteristics",
+                    "use_cases": [
+                        "Detailed use case 1",
+                        "Detailed use case 2",
+                        "Additional use cases..."
+                    ]
                 }},
                 "suggested_location": {{
-                    "shelf": "",
-                    "container": "",
-                    "reasoning": "Explain why this is the best location"
+                    "shelf": "shelf name from structure",
+                    "container": "container name",
+                    "reasoning": "Detailed explanation for this location choice"
                 }},
                 "alternative_locations": [
                     {{
-                        "shelf": "Different shelf name",
-                        "container": "Different container name",
-                        "reasoning": "Explain why this is a good alternative"
+                        "shelf": "different shelf name",
+                        "container": "container name",
+                        "reasoning": "Explanation for this alternative"
                     }}
                 ]
             }}
 
-            Make sure to use actual shelf and container names from the provided storage structure."""
+            Ensure all technical details are accurate and comprehensive. Use actual shelf and container names from the provided storage structure."""
 
             logger.debug("Making API request to OpenAI")
             response = self.client.chat.completions.create(
@@ -127,7 +155,7 @@ class ImageProcessor:
                         ]
                     }
                 ],
-                max_tokens=800
+                max_tokens=1000
             )
             
             # Get the response content and clean it
@@ -138,7 +166,7 @@ class ImageProcessor:
                 parsed_json = json.loads(cleaned_json)
                 return parsed_json
             except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse cleaned JSON: {str(e)}")
+                logger.error(f"Failed to parse JSON: {str(e)}")
                 logger.debug(f"Raw response: {response_content}")
                 logger.debug(f"Cleaned JSON: {cleaned_json}")
                 raise
@@ -146,17 +174,3 @@ class ImageProcessor:
         except Exception as e:
             logger.error(f"Error in process_image: {str(e)}", exc_info=True)
             raise
-
-    def encode_image(self, image_path):
-        try:
-            with open(image_path, "rb") as image_file:
-                return base64.b64encode(image_file.read()).decode('utf-8')
-        except Exception as e:
-            logger.error(f"Error encoding image: {str(e)}", exc_info=True)
-            raise
-
-    def clean_json_string(self, json_str: str) -> str:
-        """Clean the JSON string by removing markdown code blocks and other formatting."""
-        json_str = re.sub(r'```json\s*', '', json_str)
-        json_str = re.sub(r'```\s*$', '', json_str)
-        return json_str.strip()

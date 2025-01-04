@@ -1,3 +1,4 @@
+// frontend/src/components/inventory/ClassificationResults.tsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Classification } from './types';
@@ -35,19 +36,25 @@ export default function ClassificationResults({ classification, onReset }: Class
       setStoredStatus('pending');
       setStatusMessage('Storing item...');
 
+      // Updated itemData structure to properly include technical details
       const itemData = {
         category: parsedClassification.category,
         subcategory: parsedClassification.subcategory,
         brand: parsedClassification.properties?.brand,
         model: parsedClassification.properties?.model,
         condition: parsedClassification.properties?.condition,
+        technical_details: {
+          description: parsedClassification.technical_details?.description,
+          use_cases: parsedClassification.technical_details?.use_cases || []
+        },
         selected_location: selectedLocation ? {
           shelf: selectedLocation.shelf,
           container: selectedLocation.container,
           reasoning: selectedLocation.reasoning
-        } : null,
-        raw_properties: parsedClassification.properties
+        } : null
       };
+
+      console.log('Storing item with data:', itemData); // Debug log
 
       const response = await axios.post('http://localhost:5000/api/inventory/items', itemData);
 
@@ -99,10 +106,12 @@ export default function ClassificationResults({ classification, onReset }: Class
             <h4 className="font-medium text-lg">Technical Details</h4>
             
             {/* Description */}
-            <div>
-              <h5 className="font-medium text-sm text-gray-600">Description:</h5>
-              <p className="mt-1">{parsedClassification.technical_details.description}</p>
-            </div>
+            {parsedClassification.technical_details.description && (
+              <div>
+                <h5 className="font-medium text-sm text-gray-600">Description:</h5>
+                <p className="mt-1">{parsedClassification.technical_details.description}</p>
+              </div>
+            )}
             
             {/* Use Cases */}
             {parsedClassification.technical_details.use_cases && (
