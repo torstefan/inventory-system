@@ -12,10 +12,7 @@ import uuid
 backend_dir = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(backend_dir))
 
-from llm.processors.image_processor import ImageProcessor
-
 image_bp = Blueprint('image', __name__)
-processor = ImageProcessor()
 
 # Define absolute paths
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
@@ -30,14 +27,11 @@ def generate_unique_filename(original_filename):
     ext = os.path.splitext(original_filename)[1]
     return f"{uuid.uuid4()}{ext}"
 
-@image_bp.route('/static/uploads/<path:filename>')
-def serve_image(filename):
-    return send_from_directory(str(UPLOAD_DIR), filename)
-
-@image_bp.route('/upload', methods=['POST'])
-def upload_image():
+@image_bp.route('/raw-upload', methods=['POST'])
+def upload_raw_image():
+    """Upload image without LLM processing"""
     try:
-        current_app.logger.info("Processing image upload request")
+        current_app.logger.info("Processing raw image upload request")
         
         if 'image' not in request.files:
             current_app.logger.warning("No image file in request")
@@ -59,24 +53,19 @@ def upload_image():
         if not filepath.exists():
             raise Exception(f"Failed to save file at {filepath}")
         
-        # Log file permissions
-        current_app.logger.debug(f"File permissions: {oct(filepath.stat().st_mode)[-3:]}")
-        
-        # Process the image with GPT-4 Vision
-        current_app.logger.info("Processing image with GPT-4 Vision")
-        classification = processor.process_image(str(filepath))
-        
-        # Update the image path to include the uploads directory
+        # Return the path relative to the uploads directory
         image_path = f'uploads/{filename}'
-        classification['image_path'] = image_path
         
-        current_app.logger.info(f"Image processed successfully. Path: {image_path}")
+        current_app.logger.info(f"Image uploaded successfully. Path: {image_path}")
         return jsonify({
-            'message': 'Image processed successfully',
-            'filepath': image_path,
-            'classification': classification
+            'message': 'Image uploaded successfully',
+            'filepath': image_path
         })
         
     except Exception as e:
-        current_app.logger.error(f"Error processing image: {str(e)}", exc_info=True)
+        current_app.logger.error(f"Error uploading image: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+@image_bp.route('/static/uploads/<path:filename>')
+def serve_image(filename):
+    return send_from_directory(str(UPLOAD_DIR), filename)

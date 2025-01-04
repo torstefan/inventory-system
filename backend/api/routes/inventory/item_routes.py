@@ -94,12 +94,11 @@ def get_item(item_id):
 
 
 
-
 @inventory_bp.route('/items/<int:item_id>', methods=['PUT'])
 def update_item(item_id):
     try:
         data = request.get_json()
-        current_app.logger.debug(f"Received update data: {data}")  # Debug log
+        current_app.logger.debug(f"Received update data: {data}")
 
         db = SessionLocal()
 
@@ -107,14 +106,7 @@ def update_item(item_id):
         if not item:
             return jsonify({'error': 'Item not found'}), 404
 
-        # Just update the image path if that's all we got
-        if 'image_path' in data and len(data) == 1:
-            current_app.logger.debug(f"Updating only image path to: {data['image_path']}")
-            item.image_path = data['image_path']
-            db.commit()
-            return jsonify(item.to_dict())
-
-        # Otherwise handle full update
+        # Update standard fields
         if 'category' in data:
             item.category = data['category']
         if 'subcategory' in data:
@@ -125,25 +117,24 @@ def update_item(item_id):
             item.model = data['model']
         if 'condition' in data:
             item.condition = data['condition']
-        if 'technical_description' in data:
-            item.technical_details = {
-                'description': data['technical_description']
-            }
-        if 'use_cases' in data:
-            if isinstance(item.technical_details, dict):
-                item.technical_details['use_cases'] = data['use_cases']
-            else:
-                item.technical_details = {'use_cases': data['use_cases']}
-        if 'selected_location' in data and data['selected_location']:
-            item.shelf_id = data['selected_location'].get('shelf_id')
-            item.container_id = data['selected_location'].get('container_id')
+        if 'image_path' in data:
+            item.image_path = data['image_path']
+        if 'technical_details' in data:
+            item.technical_details = data['technical_details']
+
+        # Handle location update - using shelf_id and container_id directly
+        current_app.logger.debug(f"Location update - shelf_id: {data.get('shelf_id')}, container_id: {data.get('container_id')}")
+        if 'shelf_id' in data:
+            item.shelf_id = data['shelf_id']
+        if 'container_id' in data:
+            item.container_id = data['container_id']
 
         db.commit()
+        db.refresh(item)
 
-        # Log the updated item details
-        current_app.logger.debug(f"Updated item {item_id}. Image path: {item.image_path}")
-
-        return jsonify(item.to_dict())
+        result = item.to_dict()
+        current_app.logger.debug(f"Updated item result: {result}")
+        return jsonify(result)
 
     except Exception as e:
         db.rollback()

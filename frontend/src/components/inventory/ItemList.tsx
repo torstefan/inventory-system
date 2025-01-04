@@ -203,8 +203,11 @@ export default function ItemList() {
         condition: editingItem.data.condition,
         technical_description: editingItem.data.technical_description,
         use_cases: editingItem.data.use_cases,
-        selected_location: editingItem.data.selected_location
+        selected_location: editingItem.data.selected_location,
+        image_path: editingItem.data.image_path  // Add this line to include the image path
       };
+      
+      console.log('Saving with update data:', updateData); // Debug log
       
       await axios.put(
         `http://localhost:5000/api/inventory/items/${editingItem.id}`, 
@@ -212,7 +215,7 @@ export default function ItemList() {
       );
       
       setEditingItem(null);
-      await fetchItems();
+      await fetchItems();  // This will refresh the list with updated data
     } catch (error: any) {
       setError(error.response?.data?.error || 'Error updating item');
     }
@@ -282,16 +285,6 @@ export default function ItemList() {
                 </div>
 
                 <div className="flex justify-end space-x-2">
-                  <button
-                    className="px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 flex items-center gap-1"
-                    onClick={() => {
-                      setSelectedItemForCamera(item.id);
-                      setIsCameraOpen(true);
-                    }}
-                  >
-                    <Camera size={16} />
-                    Update Picture
-                  </button>
                   <button
                     className="px-3 py-1 bg-yellow-100 text-yellow-600 rounded hover:bg-yellow-200"
                     onClick={() => handleEdit(item)}
