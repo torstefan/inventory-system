@@ -1,3 +1,4 @@
+// frontend/src/components/inventory/InventorySystem.tsx
 'use client'
 
 import React, { useState } from 'react';
@@ -5,7 +6,7 @@ import axios from 'axios';
 import CameraCapture from '@/components/inventory/CameraCapture';
 import ClassificationResults from '@/components/inventory/ClassificationResults';
 import SearchPanel from '@/components/inventory/SearchPanel';
-import ItemList from './ItemList';
+import { ItemList } from './item-list';
 import { Classification } from './types';
 
 export default function InventorySystem() {

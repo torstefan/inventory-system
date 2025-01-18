@@ -1,9 +1,9 @@
-// frontend/src/components/inventory/ItemEditForm.tsx
+// frontend/src/components/inventory/shared/ItemEditForm.tsx
 import React, { useState } from 'react';
 import axios from 'axios';
-import { EditingItem } from '../types/itemTypes';
+import { EditingItem } from '@/types/itemTypes';
 import { Camera, Wand2 } from 'lucide-react';
-import CameraModal from '../common/CameraModal';
+import CameraModal from '@/components/common/CameraModal';
 
 interface ItemEditFormProps {
   editingItem: EditingItem;
@@ -31,19 +31,15 @@ export default function ItemEditForm({
 
   const handleImageCapture = async (image: string) => {
     try {
-      // Convert base64 image to blob
       const response = await fetch(image);
       const blob = await response.blob();
       
-      // Create FormData for simple file upload
       const formData = new FormData();
       formData.append('image', blob, 'item.jpg');
       
-      // Upload image without processing
       const uploadResponse = await axios.post('http://localhost:5000/api/images/raw-upload', formData);
       const imagePath = uploadResponse.data.filepath;
       
-      // Update the editing item with just the new image path
       onEditingChange({
         ...editingItem,
         data: {
@@ -73,7 +69,6 @@ export default function ItemEditForm({
       const response = await axios.post('http://localhost:5000/api/text/analyze', currentData);
       const analysis = response.data.analysis;
 
-      // Update the editing item with the new analysis
       onEditingChange({
         ...editingItem,
         data: {
@@ -87,7 +82,6 @@ export default function ItemEditForm({
         }
       });
 
-      // If there's a suggested location, update the select
       if (analysis.suggested_location) {
         const locationString = `${analysis.suggested_location.shelf}|||${analysis.suggested_location.container}`;
         onSelectedLocationChange(locationString);

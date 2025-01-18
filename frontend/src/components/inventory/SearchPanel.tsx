@@ -4,8 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { debounce } from 'lodash';
 import axios from 'axios';
-import ItemBasicInfo from './ItemBasicInfo';
-import ItemTechnicalDetails from './ItemTechnicalDetails';
+import { ItemBasicInfo, ItemTechnicalDetails } from './shared';
 import { StoredItem } from '../types/itemTypes';
 
 export default function SearchPanel() {

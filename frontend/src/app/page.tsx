@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import InventorySystem from '@/components/inventory/InventorySystem';
 import StorageManagement from '@/components/storage/StorageManagement';
 import DataManagement from '@/components/DataManagement';
-import ItemList from '@/components/inventory/ItemList';
+import { ItemList } from '@/components/inventory/item-list';
 
 export default function Home() {
   const [currentView, setCurrentView] = useState<'list' | 'inventory' | 'storage' | 'data'>('list');
@@ -61,7 +61,7 @@ export default function Home() {
       </nav>
 
       {/* Content Container */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="px-4">
         {currentView === 'list' && <ItemList />}
         {currentView === 'inventory' && <InventorySystem />}
         {currentView === 'storage' && <StorageManagement />}
