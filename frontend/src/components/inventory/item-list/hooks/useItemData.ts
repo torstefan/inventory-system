@@ -3,13 +3,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { debounce } from 'lodash';
 import axios from 'axios';
 import { StoredItem } from '@/types/itemTypes';
+import { usePersistentSearch } from './usePersistentSearch';
 
 export const useItemData = () => {
   const [items, setItems] = useState<StoredItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<StoredItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = usePersistentSearch();
 
   const fetchItems = async () => {
     try {
