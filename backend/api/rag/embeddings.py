@@ -28,47 +28,53 @@ class InventoryEmbeddingManager:
         if item.model:
             parts.append(f"Model: {item.model}")
             
-        # Add technical details if available
+        # Add technical details
         if item.technical_details:
-            if 'description' in item.technical_details:
-                parts.append(f"Description: {item.technical_details['description']}")
-            if 'use_cases' in item.technical_details:
-                parts.append(f"Use Cases: {', '.join(item.technical_details['use_cases'])}")
-                
-        # Add storage location if available
+            parts.append(f"Technical Details: {item.technical_details}")
+        
+        # Add storage location
         if storage:
-            parts.append(f"Location: {storage.get('shelf_name', '')} - {storage.get('container_name', '')}")
-            
-        return " | ".join(parts)
+            location_parts = []
+            if storage.get('shelf'):
+                shelf = storage['shelf']  # This is a StorageLevel1 object
+                location_parts.append(shelf.name)  # Access the name directly
+            if storage.get('container'):
+                container = storage['container']  # This is a StorageLevel2 object
+                location_parts.append(container.name)  # Access the name directly
+            if location_parts:
+                parts.append(f"Location: {' - '.join(location_parts)}")
+        
+        return "\n".join(parts)
 
     async def create_embeddings(self, db: Session) -> List[Dict[str, Any]]:
-        """Create or update embeddings for all items in the database"""
+        """Create embeddings for all items"""
         try:
-            logger.info("Starting embeddings creation")
-            
-            # Get all items and their storage locations
+            # Get all items with their storage locations
             items = db.query(StoredItem).all()
-            storage_locations = {}
-            
-            # Build storage location lookup
-            shelves = db.query(StorageLevel1).all()
-            for shelf in shelves:
-                for container in shelf.containers:
-                    storage_locations[container.id] = {
-                        'shelf_name': shelf.name,
-                        'container_name': container.name
-                    }
+            embeddings_data = []
             
             # Process items in batches
-            embeddings_data = []
-            batch_size = 100
+            batch_size = 10
             for i in range(0, len(items), batch_size):
                 batch = items[i:i + batch_size]
-                batch_texts = []
                 
-                # Prepare texts for batch processing
+                # Get storage locations for batch
+                storage_locations = {}
                 for item in batch:
-                    storage = storage_locations.get(item.shelf_id) if item.shelf_id else None
+                    if item.shelf_id:
+                        shelf = db.query(StorageLevel1).filter_by(id=item.shelf_id).first()
+                        container = None
+                        if item.container_id:
+                            container = db.query(StorageLevel2).filter_by(id=item.container_id).first()
+                        storage_locations[item.shelf_id] = {
+                            'shelf': shelf,  # Store the actual model objects
+                            'container': container
+                        }
+                
+                # Generate text and get embeddings for batch
+                batch_texts = []
+                for item in batch:
+                    storage = storage_locations.get(item.shelf_id)
                     text = self.generate_item_text(item, storage)
                     batch_texts.append(text)
                 
@@ -85,7 +91,7 @@ class InventoryEmbeddingManager:
                         "embedding": embedding_data.embedding,
                         "text": text
                     })
-                    
+                
                 logger.debug(f"Processed batch of {len(batch)} items")
             
             logger.info(f"Successfully created embeddings for {len(embeddings_data)} items")

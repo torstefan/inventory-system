@@ -1,15 +1,22 @@
 // frontend/src/app/page.tsx
 'use client'
 
-import React, { useState } from 'react';
+import React from 'react';
 import InventorySystem from '@/components/inventory/InventorySystem';
 import StorageManagement from '@/components/storage/StorageManagement';
 import DataManagement from '@/components/DataManagement';
 import { ItemList } from '@/components/inventory/item-list';
 import QuestionAnswerView from '@/components/inventory/QuestionAnswerView';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 export default function Home() {
-  const [currentView, setCurrentView] = useState<'list' | 'inventory' | 'storage' | 'data' | 'ask'>('list');
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const currentTab = searchParams.get('tab') || 'inventory';
+
+  const navigateToTab = (tab: string) => {
+    router.push(`/?tab=${tab}`);
+  };
 
   return (
     <main className="min-h-screen">
@@ -19,51 +26,51 @@ export default function Home() {
           <div className="flex space-x-4 h-14">
             <button
               className={`inline-flex items-center px-4 h-full border-b-2 ${
-                currentView === 'list'
+                currentTab === 'list'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
-              onClick={() => setCurrentView('list')}
+              onClick={() => navigateToTab('list')}
             >
               Items
             </button>
             <button
               className={`inline-flex items-center px-4 h-full border-b-2 ${
-                currentView === 'inventory'
+                currentTab === 'inventory'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
-              onClick={() => setCurrentView('inventory')}
+              onClick={() => navigateToTab('inventory')}
             >
               Register Item
             </button>
             <button
               className={`inline-flex items-center px-4 h-full border-b-2 ${
-                currentView === 'storage'
+                currentTab === 'storage'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
-              onClick={() => setCurrentView('storage')}
+              onClick={() => navigateToTab('storage')}
             >
               Storage Management
             </button>
             <button
               className={`inline-flex items-center px-4 h-full border-b-2 ${
-                currentView === 'data'
+                currentTab === 'data'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
-              onClick={() => setCurrentView('data')}
+              onClick={() => navigateToTab('data')}
             >
               Data Management
             </button>
             <button
               className={`inline-flex items-center px-4 h-full border-b-2 ${
-                currentView === 'ask'
+                currentTab === 'qa'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
-              onClick={() => setCurrentView('ask')}
+              onClick={() => navigateToTab('qa')}
             >
               Ask Questions
             </button>
@@ -74,11 +81,11 @@ export default function Home() {
       {/* Content Container */}
       <div className="px-4 py-6">
         <div className="max-w-7xl mx-auto">
-          {currentView === 'list' && <ItemList />}
-          {currentView === 'inventory' && <InventorySystem />}
-          {currentView === 'storage' && <StorageManagement />}
-          {currentView === 'data' && <DataManagement />}
-          {currentView === 'ask' && <QuestionAnswerView />}
+          {currentTab === 'list' && <ItemList />}
+          {currentTab === 'inventory' && <InventorySystem />}
+          {currentTab === 'storage' && <StorageManagement />}
+          {currentTab === 'data' && <DataManagement />}
+          {currentTab === 'qa' && <QuestionAnswerView />}
         </div>
       </div>
     </main>

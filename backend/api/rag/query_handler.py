@@ -53,16 +53,17 @@ class InventoryRAGHandler:
                 "answer": "Your natural language answer here",
                 "items": [
                     {
-                        "item_id": "ID of the relevant item",
+                        "item_id": "The database ID of the item",
                         "relevance": "Why this item is relevant to the query",
                         "details": {
                             "category": "Item category",
-                            "location": "Storage location",
-                            "technical_info": "Key technical details"
+                            "location": "Storage location (include shelf and container)",
+                            "technical_info": "Key technical details as a string"
                         }
                     }
                 ]
             }
+            Always include the exact database ID from the context in the item_id field.
             Include only the most relevant items. Make sure the response is valid JSON."""
 
             # Use async client for chat completion
@@ -76,6 +77,24 @@ class InventoryRAGHandler:
             )
 
             result = json.loads(response.choices[0].message.content)
+            
+            # Add database IDs to the response
+            for item in result.get('items', []):
+                # Find the corresponding item in relevant_items
+                for rel_item in relevant_items:
+                    # Match based on text content
+                    item_tech_info = str(item.get('details', {}).get('technical_info', '')).lower()
+                    rel_item_text = str(rel_item.get('text', '')).lower()
+                    
+                    if item_tech_info in rel_item_text or rel_item_text in item_tech_info:
+                        item['item_id'] = rel_item['item_id']
+                        logger.debug(f"Matched item with database ID: {item['item_id']}")
+                        break
+                
+                # If no ID was found, log a warning
+                if not item.get('item_id'):
+                    logger.warning(f"Could not find matching ID for item: {item}")
+
             logger.debug(f"Got formatted answer: {result}")
             return result
 

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Send, Package, Info, MapPin, Clock, Tag, Cpu } from 'lucide-react';
+import Link from 'next/link';
 
 interface QAEntry {
   question: string;
@@ -125,6 +126,22 @@ export const QuestionAnswerView = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Add state persistence
+  useEffect(() => {
+    // Load state from sessionStorage when component mounts
+    const savedState = sessionStorage.getItem('qaHistory');
+    if (savedState) {
+      setQaHistory(JSON.parse(savedState));
+    }
+  }, []);
+
+  // Save state when it changes
+  useEffect(() => {
+    if (qaHistory.length > 0) {
+      sessionStorage.setItem('qaHistory', JSON.stringify(qaHistory));
+    }
+  }, [qaHistory]);
+
   const checkEmbeddingsStatus = async () => {
     try {
       const response = await axios.get('http://localhost:5000/api/rag/embeddings/status');
@@ -187,13 +204,13 @@ export const QuestionAnswerView = () => {
   };
 
   const renderItemCard = (item: any) => {
-    // Add null checks and default values
     const details = item.details || {};
+    const itemId = item.item_id;
     
     return (
-      <div key={item.item_id} className="bg-white p-4 rounded-lg shadow mb-4">
+      <div key={itemId} className="bg-white p-4 rounded-lg shadow mb-4 hover:shadow-lg transition-shadow">
         <div className="flex justify-between items-start">
-          <div>
+          <div className="flex-grow">
             <h3 className="text-lg font-semibold">
               {details.category || 'Unknown Category'}
             </h3>
@@ -203,17 +220,36 @@ export const QuestionAnswerView = () => {
               </p>
             )}
           </div>
+          {/* Add View Item button */}
+          <Link 
+            href={`/inventory/items/${itemId}?from=qa`}  // Add a query parameter
+            className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm flex items-center gap-2"
+          >
+            <Package className="h-4 w-4" />
+            View Item
+          </Link>
         </div>
 
         <div className="mt-4 space-y-2">
           {details.location && (
             <p className="text-sm">
-              <span className="font-medium">Location:</span> {details.location}
+              <span className="font-medium">Location:</span>{' '}
+              <a 
+                href={`/storage/${encodeURIComponent(details.location.split(' - ')[0])}`}
+                className="text-blue-500 hover:underline"
+              >
+                {details.location}
+              </a>
             </p>
           )}
           {details.technical_info && (
             <p className="text-sm">
               <span className="font-medium">Technical Details:</span> {details.technical_info}
+            </p>
+          )}
+          {item.item_id && (
+            <p className="text-xs text-gray-500 mt-2">
+              Item ID: {item.item_id}
             </p>
           )}
         </div>

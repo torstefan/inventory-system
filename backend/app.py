@@ -4,6 +4,7 @@ from quart import Quart, jsonify, send_from_directory
 from quart_cors import cors
 from api.routes import register_routes
 from api.routes.storage_init import init_bp
+from api.routes.inventory.item_routes import inventory_bp as inventory_items_bp
 import logging
 import sys
 from pathlib import Path
@@ -26,6 +27,9 @@ def create_app():
     # Create Quart app
     app = Quart(__name__)
     
+    # Disable automatic slash redirects
+    app.url_map.strict_slashes = False
+    
     # Add logger to app
     app.logger = logger
     
@@ -46,9 +50,10 @@ def create_app():
     # Ensure upload directory exists
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Register routes - do this only once
-    register_routes(app)
+    # Register all routes
+    register_routes(app)  # This registers all routes including storage, images, etc.
     app.register_blueprint(init_bp, url_prefix='/api')
+    app.register_blueprint(inventory_items_bp, url_prefix='/api/inventory', name='inventory_items')  # Add name parameter
 
     # Add debug logging
     app.logger.info("Registered routes:")
