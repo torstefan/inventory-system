@@ -1,89 +1,71 @@
-from flask import Blueprint, jsonify
+from quart import Blueprint
+import logging
 from database.db import SessionLocal
 from api.models.storage import StorageLevel1, StorageLevel2, ContainerType
 
 init_bp = Blueprint('init', __name__)
-
-def init_storage():
-    db = SessionLocal()
-    try:
-        # Only initialize if no shelves exist
-        if db.query(StorageLevel1).first() is None:
-            # Create shelves
-            shelf_a = StorageLevel1(name="Components Shelf", description="Electronic components and small parts")
-            shelf_b = StorageLevel1(name="Tools Shelf", description="Tools and equipment")
-            shelf_c = StorageLevel1(name="Actuators Shelf", description="Motors, servos, and actuators")
-            
-            db.add_all([shelf_a, shelf_b, shelf_c])
-            db.flush()  # Get IDs for the shelves
-            
-            # Create containers for Components Shelf
-            containers_a = [
-                StorageLevel2(
-                    shelf_id=shelf_a.id,
-                    name="Small Components Box",
-                    container_type=ContainerType.REGULAR_BOX,
-                    description="Resistors, capacitors, and small ICs"
-                ),
-                StorageLevel2(
-                    shelf_id=shelf_a.id,
-                    name="MCU Container",
-                    container_type=ContainerType.DRAWER_ORGANIZER,
-                    description="Microcontrollers and development boards"
-                )
-            ]
-            
-            # Create containers for Tools Shelf
-            containers_b = [
-                StorageLevel2(
-                    shelf_id=shelf_b.id,
-                    name="Hand Tools Box",
-                    container_type=ContainerType.REGULAR_BOX,
-                    description="Screwdrivers, pliers, and wrenches"
-                ),
-                StorageLevel2(
-                    shelf_id=shelf_b.id,
-                    name="Test Equipment",
-                    container_type=ContainerType.DRAWER_ORGANIZER,
-                    description="Multimeters and testing tools"
-                )
-            ]
-            
-            # Create containers for Actuators Shelf
-            containers_c = [
-                StorageLevel2(
-                    shelf_id=shelf_c.id,
-                    name="Servo Box",
-                    container_type=ContainerType.REGULAR_BOX,
-                    description="Various servo motors"
-                ),
-                StorageLevel2(
-                    shelf_id=shelf_c.id,
-                    name="DC Motors",
-                    container_type=ContainerType.DRAWER_ORGANIZER,
-                    description="DC motors and gearboxes"
-                )
-            ]
-            
-            db.add_all(containers_a + containers_b + containers_c)
-            db.commit()
-            
-            return True
-        return False
-    except Exception as e:
-        db.rollback()
-        raise e
-    finally:
-        db.close()
+logger = logging.getLogger(__name__)
 
 @init_bp.route('/init-storage', methods=['POST'])
-def initialize_storage():
+async def initialize_storage():
+    """Initialize storage with default shelves and containers"""
     try:
-        if init_storage():
-            return jsonify({'message': 'Storage initialized successfully'}), 201
-        return jsonify({'message': 'Storage already initialized'}), 200
+        logger.debug("Starting storage initialization")
+        with SessionLocal() as db:
+            try:
+                # Check if storage is already initialized
+                existing = db.query(StorageLevel1).first()
+                if existing:
+                    logger.debug("Storage already initialized")
+                    return {'message': 'Storage already initialized', 'status': 'ok'}, 200
+
+                # Create default shelves
+                shelves = [
+                    StorageLevel1(name="Components Shelf", description="Electronic components and small parts"),
+                    StorageLevel1(name="Tools Shelf", description="Tools and equipment"),
+                    StorageLevel1(name="Actuators Shelf", description="Motors, servos, and actuators")
+                ]
+                db.add_all(shelves)
+                db.flush()
+                logger.debug(f"Created {len(shelves)} shelves")
+
+                # Create default containers
+                containers = []
+                for shelf in shelves:
+                    containers.extend([
+                        StorageLevel2(
+                            shelf_id=shelf.id,
+                            name=f"{shelf.name} Box 1",
+                            container_type=ContainerType.BOX,
+                            description=f"First box in {shelf.name}"
+                        ),
+                        StorageLevel2(
+                            shelf_id=shelf.id,
+                            name=f"{shelf.name} Drawer 1",
+                            container_type=ContainerType.DRAWER,
+                            description=f"First drawer in {shelf.name}"
+                        )
+                    ])
+                
+                db.add_all(containers)
+                db.commit()
+                logger.debug(f"Created {len(containers)} containers")
+                
+                return {
+                    'message': 'Storage initialized successfully',
+                    'status': 'ok',
+                    'shelves': len(shelves),
+                    'containers': len(containers)
+                }
+                
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Database error during initialization: {str(e)}")
+                return {'error': str(e), 'status': 'error'}, 500
+                
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error initializing storage: {str(e)}")
+        return {'error': str(e), 'status': 'error'}, 500
 
 # Optional: Run directly to initialize storage
 if __name__ == "__main__":

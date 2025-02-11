@@ -2,6 +2,7 @@ from database.db import Base, engine
 from api.models.storage import StorageLevel1, StorageLevel2, StorageLevel3, ContainerType
 from api.models.item import StoredItem
 from api.routes.storage_init import init_storage
+from api.models.embedding import ItemEmbedding
 
 def init_database():
     print("Creating database tables...")

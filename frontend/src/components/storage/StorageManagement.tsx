@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { StorageLocation, EditingState } from './types';
 import ShelfItem from './ShelfItem';
+import { logger } from '../../utils/logger';
 
 export default function StorageManagement() {
   const [locations, setLocations] = useState<StorageLocation[]>([]);
@@ -22,12 +23,43 @@ export default function StorageManagement() {
     fetchShelves();
   }, []);
 
+  useEffect(() => {
+    const initializeStorage = async () => {
+      try {
+        const response = await axios.post('http://localhost:5000/api/init-storage');
+        
+        if (response.status !== 200 && response.status !== 201) {
+          console.error('Initialization failed:', response.data);
+          throw new Error('Failed to initialize storage');
+        }
+        
+        await fetchShelves();
+      } catch (error) {
+        console.error('Error initializing storage:', error);
+        if (axios.isAxiosError(error)) {
+          if (error.response?.status === 200 && error.response?.data?.message === 'Storage already initialized') {
+            await fetchShelves();
+            return;
+          }
+          setError(error.response?.data?.message || 'Failed to initialize storage. Please try again.');
+        } else {
+          setError('Failed to initialize storage. Please try again.');
+        }
+      }
+    };
+
+    if (!locations || locations.length === 0) {
+      initializeStorage();
+    }
+  }, []);
+
   const fetchShelves = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get('http://localhost:5000/api/storage/level1');
-      const formattedLocations = Array.isArray(response.data) ? response.data : [];
+      const response = await axios.get('http://localhost:5000/api/storage/hierarchy');
+      const formattedLocations = response.data.shelves || [];
       setLocations(formattedLocations);
+      console.log('Fetched locations:', formattedLocations);
     } catch (error) {
       console.error('Error fetching shelves:', error);
       setError('Error loading shelves');
@@ -37,13 +69,21 @@ export default function StorageManagement() {
   };
 
   const handleEditShelf = async (shelfId: number) => {
-    const shelf = locations.find(loc => loc.level1.id === shelfId);
-    if (shelf) {
-      setEditing({
-        type: 'shelf',
-        id: shelfId,
-        data: { ...shelf.level1 }
-      });
+    try {
+      const shelf = locations.find(loc => loc.level1.id === shelfId);
+      if (shelf) {
+        setEditing({
+          type: 'shelf',
+          id: shelfId,
+          data: { ...shelf.level1 }
+        });
+      } else {
+        console.error('Shelf not found:', shelfId);
+        setError('Could not find shelf to edit');
+      }
+    } catch (error) {
+      console.error('Error setting up shelf edit:', error);
+      setError('Error preparing shelf edit');
     }
   };
 
@@ -59,21 +99,19 @@ export default function StorageManagement() {
     try {
       if (!editing.type || !editing.id || !editing.data) return;
 
+      const endpoint = editing.type === 'shelf' 
+        ? `http://localhost:5000/api/storage/level1/${editing.id}`
+        : `http://localhost:5000/api/storage/level2/${editing.id}`;
+
+      const response = await axios.put(endpoint, editing.data);
+      
       if (editing.type === 'shelf') {
-        const response = await axios.put(
-          `http://localhost:5000/api/storage/level1/${editing.id}`,
-          editing.data
-        );
         setLocations(prev => prev.map(loc =>
           loc.level1.id === editing.id
             ? { ...loc, level1: response.data }
             : loc
         ));
       } else {
-        const response = await axios.put(
-          `http://localhost:5000/api/storage/level2/${editing.id}`,
-          editing.data
-        );
         setLocations(prev => prev.map(loc => ({
           ...loc,
           level2: loc.level2.map(container =>
@@ -81,9 +119,12 @@ export default function StorageManagement() {
           )
         })));
       }
+      
       setEditing({ type: null, id: null, data: null });
-    } catch (error: any) {
-      setError(error.response?.data?.error || 'Error saving changes');
+      setError(null);
+    } catch (error) {
+      console.error('Error saving edit:', error);
+      setError('Failed to save changes. Please try again.');
     }
   };
 

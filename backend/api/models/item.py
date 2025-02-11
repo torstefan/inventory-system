@@ -1,8 +1,9 @@
 # backend/api/models/item.py
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, JSON
+from sqlalchemy import Column, Integer, String, JSON, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from database.db import Base
 from datetime import datetime
+from .embedding import ItemEmbedding
 
 class StoredItem(Base):
     __tablename__ = 'stored_items'
@@ -15,15 +16,16 @@ class StoredItem(Base):
     condition = Column(String)
     technical_details = Column(JSON)
     
-    shelf_id = Column(Integer, ForeignKey('storage_level1.id'))
-    container_id = Column(Integer, ForeignKey('storage_level2.id'))
+    shelf_id = Column(Integer, ForeignKey('storage_level1.id', ondelete='SET NULL'), nullable=True)
+    container_id = Column(Integer, ForeignKey('storage_level2.id', ondelete='SET NULL'), nullable=True)
     
-    shelf = relationship("StorageLevel1")
-    container = relationship("StorageLevel2")
+    shelf = relationship("StorageLevel1", back_populates="items")
+    container = relationship("StorageLevel2", back_populates="items")
     
     image_path = Column(String)
     date_added = Column(DateTime, default=datetime.utcnow)
     last_modified = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    embedding = relationship("ItemEmbedding", back_populates="item", uselist=False, cascade="all, delete-orphan")
 
     def to_dict(self):
         """Convert item to dictionary representation"""

@@ -7,7 +7,7 @@ import CameraModal from '@/components/common/CameraModal';
 
 interface ItemEditFormProps {
   editingItem: EditingItem;
-  availableLocations: any[];
+  availableLocations: StorageLocation[];
   selectedLocation: string;
   onEditingChange: (editing: EditingItem) => void;
   onSelectedLocationChange: (value: string) => void;
@@ -28,6 +28,8 @@ export default function ItemEditForm({
   const [imageError, setImageError] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [manualDescription, setManualDescription] = useState('');
+
+  const locations = Array.isArray(availableLocations) ? availableLocations : [];
 
   const handleImageCapture = async (image: string) => {
     try {
@@ -248,7 +250,7 @@ export default function ItemEditForm({
             }}
           >
             <option value="">Select location</option>
-            {availableLocations.map((loc) => 
+            {locations.map((loc) => 
               loc.level2.map((container: any) => {
                 const value = `${loc.level1.name}|||${container.name}`;
                 return (

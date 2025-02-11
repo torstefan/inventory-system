@@ -8,12 +8,14 @@ import json
 from pathlib import Path
 import uuid
 from llm.processors.image_processor import ImageProcessor
+import logging
 
 # Add the backend directory to the Python path
 backend_dir = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(backend_dir))
 
 image_bp = Blueprint('image', __name__)
+logger = logging.getLogger(__name__)
 
 # Define absolute paths
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
@@ -32,19 +34,16 @@ def generate_unique_filename(original_filename):
     return f"{uuid.uuid4()}{ext}"
 
 @image_bp.route('/upload', methods=['POST'])
-def upload_image():
+async def upload_image():
     """Upload and process image with LLM analysis"""
     try:
-        current_app.logger.info("Processing image upload request")
-        
-        if 'image' not in request.files:
-            current_app.logger.warning("No image file in request")
-            return jsonify({'error': 'No image provided'}), 400
-        
-        file = request.files['image']
+        files = await request.files
+        if 'image' not in files:
+            return {'error': 'No image file provided'}, 400
+
+        file = files['image']
         if file.filename == '':
-            current_app.logger.warning("Empty filename received")
-            return jsonify({'error': 'No selected file'}), 400
+            return {'error': 'No selected file'}, 400
         
         # Generate a unique filename
         filename = generate_unique_filename(secure_filename(file.filename))
@@ -69,9 +68,8 @@ def upload_image():
             'message': 'Image uploaded and processed successfully',
             'classification': classification
         })
-        
     except Exception as e:
-        current_app.logger.error(f"Error processing image: {str(e)}", exc_info=True)
+        logger.error(f"Error uploading image: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @image_bp.route('/raw-upload', methods=['POST'])
@@ -114,5 +112,12 @@ def upload_raw_image():
         return jsonify({'error': str(e)}), 500
 
 @image_bp.route('/static/uploads/<path:filename>')
-def serve_image(filename):
-    return send_from_directory(str(UPLOAD_DIR), filename)
+async def serve_image(filename):
+    try:
+        return await send_file(
+            Path(current_app.config['UPLOAD_FOLDER']) / filename,
+            mimetype='image/jpeg'
+        )
+    except Exception as e:
+        logger.error(f"Error serving image: {str(e)}")
+        return {'error': 'Image not found'}, 404

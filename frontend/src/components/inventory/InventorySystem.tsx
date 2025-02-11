@@ -10,7 +10,7 @@ import { ItemList } from './item-list';
 import { Classification } from './types';
 
 export default function InventorySystem() {
-  const [mode, setMode] = useState<'register' | 'search' | 'list'>('register');
+  const [mode, setMode] = useState<'register' | 'search'>('register');
   const [inputMethod, setInputMethod] = useState<'text' | 'image'>('text');
   const [itemDescription, setItemDescription] = useState('');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -95,14 +95,6 @@ export default function InventorySystem() {
           onClick={() => setMode('search')}
         >
           Search
-        </button>
-        <button
-          className={`px-4 py-2 rounded-lg ${
-            mode === 'list' ? 'bg-blue-500 text-white' : 'bg-gray-200'
-          }`}
-          onClick={() => setMode('list')}
-        >
-          View All Items
         </button>
       </div>
 
@@ -192,9 +184,6 @@ export default function InventorySystem() {
 
       {/* Search Mode */}
       {mode === 'search' && <SearchPanel />}
-
-      {/* List Mode */}
-      {mode === 'list' && <ItemList />}
     </div>
   );
 }

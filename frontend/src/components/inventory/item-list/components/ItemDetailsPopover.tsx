@@ -1,5 +1,5 @@
 // frontend/src/components/inventory/item-list/components/ItemDetailsPopover.tsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StoredItem } from '@/types/itemTypes';
 
 interface ItemDetailsPopoverProps {
@@ -11,14 +11,28 @@ interface ItemDetailsPopoverProps {
 }
 
 export const ItemDetailsPopover: React.FC<ItemDetailsPopoverProps> = ({ item, position }) => {
+  const [maxHeight, setMaxHeight] = useState<number>(window.innerHeight - 40); // 20px padding top and bottom
+
+  useEffect(() => {
+    // Update max height when position changes
+    const topSpace = position.y;
+    const bottomSpace = window.innerHeight - position.y;
+    const availableHeight = Math.max(topSpace, bottomSpace);
+    setMaxHeight(availableHeight - 40); // 20px padding top and bottom
+  }, [position.y]);
+
+  const style: React.CSSProperties = {
+    top: `${position.y}px`,
+    left: `${position.x}px`,
+    maxHeight: `${maxHeight}px`,
+    overflowY: 'auto',
+    zIndex: 1000
+  };
+
   return (
     <div 
       className="fixed bg-white rounded-lg shadow-lg border p-4 w-96"
-      style={{
-        top: `${position.y}px`,
-        left: `${position.x}px`,
-        zIndex: 1000
-      }}
+      style={style}
     >
       <div className="space-y-4">
         {/* Image */}

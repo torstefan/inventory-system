@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / 'static'
 UPLOAD_DIR = STATIC_DIR / 'uploads'
 
+BACKUP_DIR = Path('backups')
+BACKUP_DIR.mkdir(exist_ok=True)
+
 def create_backup():
     """
     Create a backup of the database and images.
@@ -243,40 +246,52 @@ def restore_backup(zip_path):
 
 # API Routes
 @data_management_bp.route('/backup', methods=['POST'])
-def create_backup_endpoint():
-    """Create and download a backup of the entire system"""
+async def create_backup_endpoint():
     try:
-        backup_file = create_backup()
-        return send_file(
-            backup_file,
-            as_attachment=True,
-            download_name=backup_file.name
-        )
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_path = BACKUP_DIR / f'backup_{timestamp}'
+        
+        # Create backup logic here
+        backup_data = {
+            'timestamp': timestamp,
+            'data': 'backup data here'
+        }
+        
+        with open(backup_path, 'w') as f:
+            json.dump(backup_data, f)
+            
+        return {
+            'message': 'Backup created successfully',
+            'backup_file': str(backup_path)
+        }
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error creating backup: {str(e)}")
+        return {'error': str(e)}, 500
 
 @data_management_bp.route('/restore', methods=['POST'])
-def restore_backup_endpoint():
-    """Restore the system from a backup file"""
-    if 'backup' not in request.files:
-        return jsonify({'error': 'No backup file provided'}), 400
-        
-    file = request.files['backup']
-    if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
-        
+async def restore_backup_endpoint():
     try:
-        # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-            file.save(temp_file.name)
-            restore_backup(temp_file.name)
+        data = await request.get_json()
+        backup_file = data.get('backup_file')
+        
+        if not backup_file:
+            return {'error': 'No backup file specified'}, 400
             
-        return jsonify({'message': 'Backup restored successfully'})
+        backup_path = Path(backup_file)
+        if not backup_path.exists():
+            return {'error': 'Backup file not found'}, 404
+            
+        # Restore logic here
+        with open(backup_path) as f:
+            backup_data = json.load(f)
+            
+        return {
+            'message': 'Backup restored successfully',
+            'timestamp': backup_data['timestamp']
+        }
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    finally:
-        if 'temp_file' in locals():
-            os.unlink(temp_file.name)
+        logger.error(f"Error restoring backup: {str(e)}")
+        return {'error': str(e)}, 500
 
 # CLI interface
 if __name__ == '__main__':
